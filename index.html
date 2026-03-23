@@ -474,14 +474,16 @@ function genCitation(r, style='apa') {
 }
 
 function renderResultCard(r, idx) {
-  const doiLink = r.doi ? `https://doi.org/${r.doi}` : r.link;
-  const titleLink = doiLink ? `<a href="${doiLink}" target="_blank">${r.title}</a>` : r.title;
+  const doiLink = r.doi ? `https://doi.org/${r.doi}` : (r.link || r.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/` : null);
+  const titleLink = doiLink ? `<a href="${doiLink}" target="_blank">${r.title}</a>` : (r.link ? `<a href="${r.link}" target="_blank">${r.title}</a>` : r.title);
+  const srcBadge = r._source ? `<span class="rcard-tag" style="background:${{'PRIMO':'#fef3c7','PubMed':'#d1fae5','Google Scholar':'#e0e7ff'}[r._source]||'var(--bg)'};color:${{'PRIMO':'#92400e','PubMed':'#065f46','Google Scholar':'#3730a3'}[r._source]||'var(--mu)'}">${r._source}</span>` : '';
+  const citeBadge = r.citations ? `<span class="rcard-tag" style="background:#fef3c7;color:#92400e">Cited: ${r.citations}</span>` : '';
   return `<div class="rcard" id="rc${idx}">
     <div class="rcard-title">${titleLink}</div>
-    <div class="rcard-meta"><strong>${r.creator}</strong> · ${r.date} · ${r.type||'Article'}</div>
+    <div class="rcard-meta"><strong>${r.creator||'Unknown'}</strong> · ${r.date||''} · ${r.type||'Article'}</div>
     ${r.source?`<div class="rcard-meta">${r.source}${r.volume?' Vol.'+r.volume:''}${r.issue?'('+r.issue+')':''}</div>`:''}
     ${r.description?`<div class="rcard-desc">${r.description}</div>`:''}
-    <div class="rcard-tags">${r.openaccess?'<span class="rcard-tag oa">Open Access</span>':''}${r.type?`<span class="rcard-tag">${r.type}</span>`:''}</div>
+    <div class="rcard-tags">${srcBadge}${citeBadge}${r.openaccess?'<span class="rcard-tag oa">Open Access</span>':''}${r.type?`<span class="rcard-tag">${r.type}</span>`:''}</div>
     <div class="rcard-actions">
       <button class="rcard-btn" onclick="showCite(${idx},'apa')">APA</button>
       <button class="rcard-btn" onclick="showCite(${idx},'ieee')">IEEE</button>
@@ -568,29 +570,116 @@ async function fullSearch(msg, chatHist, cm) {
   let p;
   try{p=await buildBoolean(msg,chatHist);}catch(e){p={boolean:msg,natural:'Searching for: '+msg,explanation:'',year_from:'',year_to:'',peer_reviewed:false,open_access:false};}
   const {boolean:bool,corrected,natural,explanation,year_from:yf,year_to:yt,peer_reviewed:pr,open_access:oa}=p;
+  const cleanQ = bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').trim();
 
-  // Show interpreted query + PRIMO links
-  loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="scard-title">🔍 Search: ${natural||explanation} ${badge()}</div><div class="bool-str">${bool}</div>${buildSearchCard(bool,explanation,corrected,msg,yf,yt,pr,oa,false)}<div style="margin-top:10px;font-size:.8rem;color:var(--mu)"><div class="typing"><span></span><span></span><span></span></div> Searching PRIMO for real results…</div><div id="primo-results-area"></div></div>`;
-  cm.scrollTop=cm.scrollHeight;
+  // Detect: books vs articles, medical topic
+  const qLower = msg.toLowerCase();
+  const wantBooks = /\b(books?|ebooks?|textbooks?)\b/i.test(qLower);
+  const isMedical = MEDICAL_RE.test(qLower);
 
-  // Fetch real results from PRIMO API
-  try {
-    const data = await searchPRIMO(bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').trim(), {pr,oa,yf,yt,limit:5});
-    window._primoResults = data.results||[];
+  if (wantBooks) {
+    // BOOKS → search PRIMO directly
+    loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="scard-title">📗 Book Search: ${natural||explanation} ${badge()}</div><div class="bool-str">${bool}</div>${buildSearchCard(bool,explanation,corrected,msg,yf,yt,pr,oa,false)}<div style="margin-top:10px;font-size:.8rem;color:var(--mu)"><div class="typing"><span></span><span></span><span></span></div> Searching PRIMO for books…</div><div id="primo-results-area"></div></div>`;
+    cm.scrollTop=cm.scrollHeight;
+    await searchAndShowResults(cleanQ, 'primo', loadEl, bool, pr, oa, yf, yt);
+    // Offer other sources after books
     const area = loadEl.querySelector('#primo-results-area');
-    if(data.results && data.results.length > 0) {
-      area.innerHTML = `<div style="font-size:.82rem;font-weight:700;color:var(--ku-blue);margin:10px 0 6px">📄 Top ${data.results.length} of ${data.total.toLocaleString()} results:</div>` + data.results.map((r,i)=>renderResultCard(r,i)).join('') + `<div style="text-align:center;margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Want more results? <a href="${mkURL(bool,'Everything','MyInst_and_CI',[])}" target="_blank" style="color:var(--ku-blue);font-weight:700">Search all ${data.total.toLocaleString()} results in PRIMO →</a></div>`;
-    } else {
-      area.innerHTML = `<div style="font-size:.82rem;color:var(--mu);margin-top:8px">No results found via PRIMO API. Try the links above to search directly.</div>`;
-    }
-  } catch(e) {
-    const area = loadEl.querySelector('#primo-results-area');
-    if(area) area.innerHTML = `<div style="font-size:.78rem;color:var(--mu);margin-top:8px">PRIMO API: ${e.message}. Use the links above to search directly.</div>`;
+    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Want to explore more? <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="fq" onclick="searchOther('${esc(cleanQ)}','scholar')">🎓 Google Scholar</button><button class="fq" onclick="searchOther('${esc(cleanQ)}','consensus')">🔬 Consensus</button>${isMedical?`<button class="fq" onclick="searchOther('${esc(cleanQ)}','pubmed')">🏥 PubMed</button>`:''}</div></div>`;
+  } else {
+    // ARTICLES/RESOURCES → show source selection
+    const medBtn = isMedical ? `<button onclick="pickSource('${esc(cleanQ)}','pubmed','${esc(bool)}',${pr},${oa},'${yf||''}','${yt||''}')" style="padding:8px 12px;background:#d1fae5;color:#065f46;border:1.5px solid #6ee7b7;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🏥 PubMed (Biomedical)</button>` : '';
+    loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="scard-title">🔍 ${natural||explanation} ${badge()}</div><div class="bool-str">${bool}</div><div style="font-size:.84rem;margin:10px 0 6px">Which source would you like to search?</div><div style="display:flex;flex-direction:column;gap:7px"><button onclick="pickSource('${esc(cleanQ)}','primo','${esc(bool)}',${pr},${oa},'${yf||''}','${yt||''}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 PRIMO (Khalifa University Library)</button>${medBtn}<button onclick="pickSource('${esc(cleanQ)}','scholar','${esc(bool)}',${pr},${oa},'${yf||''}','${yt||''}')" style="padding:8px 12px;background:#e0e7ff;color:#3730a3;border:1.5px solid #a5b4fc;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🎓 Google Scholar</button><button onclick="pickSource('${esc(cleanQ)}','consensus','${esc(bool)}',${pr},${oa},'${yf||''}','${yt||''}')" style="padding:8px 12px;background:#fce7f3;color:#9d174d;border:1.5px solid #f9a8d4;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🔬 Consensus</button><button onclick="pickSource('${esc(cleanQ)}','all','${esc(bool)}',${pr},${oa},'${yf||''}','${yt||''}')" style="padding:8px 12px;background:var(--bg);color:var(--txt);border:1.5px solid var(--br);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🔍 Search all sources</button></div></div>`;
   }
-
   chatHist.push({role:'assistant',content:`Search: ${natural||explanation}. Boolean: ${bool}`});
   cm.scrollTop=cm.scrollHeight;
-  showFollowUps('search');
+}
+
+function esc(s){return s.replace(/'/g,"\\'").replace(/"/g,'\\"');}
+
+// Medical topic detection regex
+const MEDICAL_RE = /\b(medicine|medical|health|clinical|nursing|pharmacy|biomedical|anatomy|physiology|epidemiology|oncology|cardiology|neuroscience|genomics|pathology|surgery|mental.?health|nutrition|public.?health|disease|therapy|treatment|diagnosis|patient|drug|pharmaceutical|cancer|diabetes|heart|brain|immunology|microbiology|virology|pediatric|dental|ophthalmology|radiology)\b/i;
+
+// User picks a source → search and show results
+async function pickSource(query, source, bool, pr, oa, yf, yt) {
+  const cm = document.getElementById('chatMsgs');
+  const loadEl = document.createElement('div');loadEl.className='msg bot';loadEl.style.maxWidth='96%';
+  const sourceLabel = {primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Google Scholar',consensus:'🔬 Consensus',all:'🔍 All Sources'}[source]||source;
+  loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="typing" style="padding:8px 0"><span></span><span></span><span></span></div><div style="font-size:.8rem;color:var(--mu)">Searching ${sourceLabel}…</div><div id="primo-results-area"></div></div>`;
+  cm.appendChild(loadEl);cm.scrollTop=cm.scrollHeight;
+
+  if (source === 'consensus') {
+    const area = loadEl.querySelector('#primo-results-area');
+    area.innerHTML = `<div style="padding:12px;text-align:center"><div style="font-size:.86rem;font-weight:700;color:#9d174d;margin-bottom:6px">🔬 Consensus — Research-backed answers</div><a href="https://consensus.app/results/?q=${encodeURIComponent(query)}" target="_blank" style="display:inline-block;padding:8px 20px;background:#9d174d;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:.84rem">Search on Consensus →</a><div style="font-size:.76rem;color:var(--mu);margin-top:6px">Consensus uses AI to find and synthesize research papers</div></div>`;
+    loadEl.querySelector('.typing')?.remove();
+    return;
+  }
+
+  if (source === 'primo') {
+    // Also show PRIMO links
+    const card = buildSearchCard(bool, '', '', query, yf, yt, pr, oa, false);
+    loadEl.querySelector('.scard').insertAdjacentHTML('afterbegin', `<div class="scard-title">${sourceLabel} Results ${badge()}</div>`);
+  }
+
+  await searchAndShowResults(query, source, loadEl, bool, pr, oa, yf, yt);
+  cm.scrollTop=cm.scrollHeight;
+}
+
+// Core search function that calls HF Space /search endpoint
+async function searchAndShowResults(query, source, loadEl, bool, pr, oa, yf, yt) {
+  const area = loadEl.querySelector('#primo-results-area');
+  try {
+    let data;
+    if (source === 'primo') {
+      // Use Cloudflare PRIMO proxy (has the API key)
+      data = await searchPRIMO(query, {pr, oa, yf, yt, limit: 5});
+    } else {
+      // Use HF Space for PubMed/Scholar/All
+      const r = await fetch(RAG_URL + '/search', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({query, source, limit: 5, peer_reviewed: pr, open_access: oa, year_from: yf, year_to: yt})
+      });
+      data = await r.json();
+    }
+
+    window._primoResults = data.results || [];
+    const srcLabel = data.source || source;
+    const resultCount = data.results?.length || 0;
+    const totalCount = data.total || 0;
+
+    if (resultCount > 0) {
+      let html = `<div style="font-size:.82rem;font-weight:700;color:var(--ku-blue);margin:10px 0 6px">📄 ${srcLabel}: Top ${resultCount} of ${totalCount.toLocaleString()} results</div>`;
+      html += data.results.map((r,i) => renderResultCard(r, i)).join('');
+
+      // PRIMO direct links
+      if (source === 'primo' && bool) {
+        html += `<div style="text-align:center;margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem"><a href="${mkURL(bool,'Everything','MyInst_and_CI',[])}" target="_blank" style="color:var(--ku-blue);font-weight:700">View all ${totalCount.toLocaleString()} results in PRIMO →</a></div>`;
+      }
+
+      // Smart fallback: if fewer than 3 results, offer other sources
+      if (resultCount < 3 && source !== 'all') {
+        const otherSources = ['primo','pubmed','scholar'].filter(s => s !== source);
+        html += `<div style="margin-top:10px;padding:10px;background:#fef3c7;border-radius:10px;font-size:.82rem;border-left:3px solid #C8A951">Only ${resultCount} result${resultCount>1?'s':''} found. Try other sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${otherSources.map(s => `<button class="fq" onclick="searchOther('${esc(query)}','${s}')">${{primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Google Scholar'}[s]}</button>`).join('')}</div></div>`;
+      }
+
+      area.innerHTML = html;
+    } else {
+      const otherSources = ['primo','pubmed','scholar'].filter(s => s !== source);
+      area.innerHTML = `<div style="font-size:.82rem;color:var(--mu);margin-top:8px">No results from ${srcLabel}. ${data.error||''}</div><div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Try other sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${otherSources.map(s => `<button class="fq" onclick="searchOther('${esc(query)}','${s}')">${{primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Google Scholar'}[s]}</button>`).join('')}</div></div>`;
+    }
+  } catch(e) {
+    area.innerHTML = `<div style="font-size:.78rem;color:var(--mu);margin-top:8px">Error: ${e.message}</div>`;
+  }
+  loadEl.querySelector('.typing')?.remove();
+}
+
+// Quick search from "try other sources" buttons
+function searchOther(query, source) {
+  const cm = document.getElementById('chatMsgs');
+  const loadEl = document.createElement('div');loadEl.className='msg bot';loadEl.style.maxWidth='96%';
+  const sourceLabel = {primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Google Scholar',consensus:'🔬 Consensus'}[source]||source;
+  loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="typing" style="padding:8px 0"><span></span><span></span><span></span></div><div style="font-size:.8rem;color:var(--mu)">Searching ${sourceLabel}…</div><div id="primo-results-area"></div></div>`;
+  cm.appendChild(loadEl);cm.scrollTop=cm.scrollHeight;
+  searchAndShowResults(query, source, loadEl, '', false, false, '', '');
 }
 
 // =================================================================
