@@ -356,14 +356,50 @@ async function _callModel(model, {system,messages,max_tokens}) {
 }
 
 // =================================================================
+// CLAUDE WEB SEARCH (for general questions)
+// =================================================================
+async function callClaudeWebSearch(messages, system) {
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    messages,
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+  };
+  if (system) body.system = system;
+  const r = await fetch(W + '/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('Claude web search failed');
+  const d = await r.json();
+  // Extract text from all content blocks
+  let text = '';
+  let sources = [];
+  for (const block of (d.content || [])) {
+    if (block.type === 'text') text += block.text;
+    if (block.type === 'web_search_tool_result') {
+      for (const sr of (block.content || [])) {
+        if (sr.type === 'web_search_result' && sr.url) {
+          sources.push({ title: sr.title || '', url: sr.url });
+        }
+      }
+    }
+  }
+  return { text, sources };
+}
+
+// =================================================================
 // RAG KNOWLEDGE QUERY (via HuggingFace Space)
 // =================================================================
 async function callRAG(question) {
   const model = activeModel === 'claude' ? 'claude' : 'gpt';
+  // Send last 5 messages for context
+  const history = chatHist.slice(-5).map(m => ({ role: m.role, content: m.content }));
   const r = await fetch(RAG_URL + '/rag', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, model })
+    body: JSON.stringify({ question, model, history })
   });
   if (!r.ok) throw new Error('RAG service unavailable');
   const data = await r.json();
@@ -484,10 +520,24 @@ function buildSearchCard(bool,explanation,corrected,raw,yf,yt,pr,oa,ol){
   const yr=(yf||yt)?`searchcreationdate,include,${yf||'0001'}|,|${yt||'9999'}`:null;
   const artF=[...(pr?['tlevel,include,peer_reviewed']:[]),...(oa?['tlevel,include,open_access']:[]),...(ol?['tlevel,include,online_resources']:[]),...(yr?[yr]:[]),'rtype,include,articles'];
   const allF=[...(pr?['tlevel,include,peer_reviewed']:[]),...(oa?['tlevel,include,open_access']:[]),...(ol?['tlevel,include,online_resources']:[]),...(yr?[yr]:[])];
+  const bkF=[...(yr?[yr]:[]),'rtype,include,books'];
   const urlAll=mkURL(bool,'Everything','MyInst_and_CI',allF);
   const urlArt=mkURL(bool,'CentralIndex','CentralIndex',artF);
+  const urlBk=mkURL(bool,'Everything','MyInst_and_CI',bkF);
   const simpleQ=bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
-  return `<div class="scard"><div class="scard-title">🔍 Search in PRIMO</div><div class="bool-str">${bool}</div><div class="slinks"><a class="slink all" href="${urlAll}" target="_blank">📚 All Resources in PRIMO</a><a class="slink art" href="${urlArt}" target="_blank">📄 Articles in PRIMO</a><a class="slink ai" href="${AI_URL+encodeURIComponent(simpleQ)}" target="_blank">🤖 PRIMO AI Assistant</a></div></div>`;
+  // Detect if user asked for books or articles
+  const q = (raw||'').toLowerCase();
+  const wantBooks = /\b(books?|ebooks?|textbooks?)\b/i.test(q);
+  const wantArticles = /\b(articles?|papers?|journals?|peer.?review)\b/i.test(q);
+  const linkAll = `<a class="slink all" href="${urlAll}" target="_blank">📚 All Resources in PRIMO</a>`;
+  const linkArt = `<a class="slink art" href="${urlArt}" target="_blank">📄 Articles in PRIMO</a>`;
+  const linkBk = `<a class="slink bk" href="${urlBk}" target="_blank">📗 Books in PRIMO</a>`;
+  const linkAI = `<a class="slink ai" href="${AI_URL+encodeURIComponent(simpleQ)}" target="_blank">🤖 PRIMO AI Assistant</a>`;
+  let links;
+  if (wantBooks) links = linkBk + linkAll + linkArt + linkAI;
+  else if (wantArticles) links = linkArt + linkAll + linkBk + linkAI;
+  else links = linkAll + linkArt + linkBk + linkAI;
+  return `<div class="scard"><div class="scard-title">🔍 Search in PRIMO</div><div class="bool-str">${bool}</div><div class="slinks">${links}</div></div>`;
 }
 
 // =================================================================
@@ -548,7 +598,7 @@ async function fullSearch(msg, chatHist, cm) {
 // =================================================================
 const DB_LIST=['sciencedirect','ieee','scopus','web of science','springer','nature journal','wiley','taylor francis','pubmed','embase','cinahl','clinicalkey','cochrane','uptodate','acm digital','scifinder','scival','jstor','proquest','emerald','knovel','ebsco','elsevier','arxiv','zendy','mdpi','asme','asce','astm','aiaa','aip','aps journal','medline','database','e-resource','eresource'];
 function isDBQuery(msg){const l=msg.toLowerCase();return DB_LIST.some(d=>l.includes(d));}
-const SEARCH_RE=/\b(find|search for|look for|show me|get me|i need|i want)\b.*(article|book|paper|journal|research|literature|publication)/i;
+const SEARCH_RE=/\b(find|search for|look for|show me|get me|i need|i want)\b.*(article|book|paper|journal|research|literature|publication|library resources)/i;
 const LIBRARY_RE=/room|booking|reserve|hours|open|closed|ill|interlibrary|loan|account|fine|fee|renew|return|borrow|orcid|khazna|open access|publish|apc|newsletter|tour|visit|alumni|ask a librarian|contact/i;
 
 async function routeQuery(msg,history){
@@ -631,6 +681,37 @@ async function sendChat(){
     chatHist.push({role:'assistant',content:'What topic?'}); return;
   }
 
+  // 4b. "Give me a general explanation of X" — answer directly, no clarification
+  const generalExplainMatch = msg.match(/(?:give me a |provide a )?general (?:explanation|overview|summary|info|information) (?:of |about |on )?(.+)/i);
+  if (generalExplainMatch) {
+    const topic = generalExplainMatch[1].replace(/[?.!]/g,'').trim();
+    const tid2='ty'+Date.now();
+    const te2=document.createElement('div');te2.className='msg bot';te2.id=tid2;
+    te2.innerHTML=`<div class="av">🤖</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    cm.appendChild(te2);cm.scrollTop=cm.scrollHeight;
+    try {
+      let reply;
+      if (activeModel === 'claude') {
+        try {
+          const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
+          reply = fmt(ws.text);
+          if (ws.sources.length > 0) {
+            reply += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+            reply += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
+            reply += '</div>';
+          }
+          reply += ' ' + badge() + ' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>';
+        } catch(e) { reply = fmt(await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:500})) + ' ' + badge(); }
+      } else {
+        reply = fmt(await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:500})) + ' ' + badge();
+      }
+      document.getElementById(tid2)?.remove();
+      chatHist.push({role:'assistant',content:reply});
+      addBotStreamed(reply); showFollowUps('general');
+    } catch(e) { document.getElementById(tid2)?.remove(); addMsg('bot','⚠️ '+e.message); }
+    return;
+  }
+
   // 5. Typing indicator + route
   const tid='ty'+Date.now();
   const te=document.createElement('div');te.className='msg bot';te.id=tid;
@@ -656,13 +737,42 @@ async function sendChat(){
         addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('library');
       }
     } else if(intent==='clarify'){
-      const topic=msg.replace(/\b(what is|tell me about|explain|about)\b/gi,'').trim()||msg;
-      addMsg('bot',`I can help with <strong>${topic}</strong>! ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find articles on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem">🔍 Find in Library</button><button onclick="chip('Explain ${topic} in detail')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem">💡 General explanation</button></div>`);
-      chatHist.push({role:'assistant',content:`What about ${topic}?`});
+      const topic=msg.replace(/\b(what is|tell me about|explain|about|i want to know|can you tell me|could you explain)\b/gi,'').trim()||msg;
+      addMsg('bot',`I can help with <strong>${topic}</strong>! What would you like? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find library resources on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find in Khalifa University Library</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation</button></div>`);
+      chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
     } else {
-      const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
-      chatHist.push({role:'assistant',content:reply});
-      addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('general');
+      // General/topic question — ask user what they want before answering
+      const topicMatch = msg.match(/\b(?:about|on|regarding|related to)\s+(.+)/i);
+      const topic = topicMatch ? topicMatch[1].replace(/[?.!]/g,'').trim() : msg.replace(/\b(what is|tell me|explain|describe|how does|how do|how is|how are|what are|who is|who are)\b/gi,'').trim() || msg;
+      const isDirectQuestion = /^(what|how|why|when|where|who|which|is |are |do |does |can |could |should )/i.test(msg);
+
+      if (isDirectQuestion && topic.length > 3) {
+        addMsg('bot',`I can help with <strong>${topic}</strong>! ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find library resources on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find in Khalifa University Library</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation (AI knowledge)</button></div>`);
+        chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
+      } else {
+        // Short or non-topic query — answer directly
+        if (activeModel === 'claude') {
+          try {
+            const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
+            let html = fmt(ws.text);
+            if (ws.sources.length > 0) {
+              html += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+              html += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
+              html += '</div>';
+            }
+            chatHist.push({role:'assistant',content:ws.text});
+            addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); showFollowUps('general');
+          } catch(wsErr) {
+            const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
+            chatHist.push({role:'assistant',content:reply});
+            addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('general');
+          }
+        } else {
+          const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
+          chatHist.push({role:'assistant',content:reply});
+          addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('general');
+        }
+      }
     }
   }catch(e){
     document.getElementById(tid)?.remove();
@@ -718,7 +828,7 @@ function showFollowUps(intent){
   const cm=document.getElementById('chatMsgs');
   const qs=intent==='search'?['Make it peer reviewed','Limit to 2020 onwards','Find books instead']:
     intent==='library'?['How do I access databases?','What are the library hours?','Reserve a room']:
-    ['Find articles on this topic','Find books on this','What databases cover this?'];
+    ['Find library resources on this topic','What databases cover this?','General explanation'];
   const d=document.createElement('div');d.className='followups';
   d.innerHTML=qs.map(q=>`<button class="fq" onclick="chip('${q}')">${q}</button>`).join('');
   cm.appendChild(d);cm.scrollTop=9999;
