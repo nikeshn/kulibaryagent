@@ -586,16 +586,16 @@ async function fullSearch(msg, chatHist, cm) {
     cm.scrollTop=cm.scrollHeight;
     await doSearchSource(sid, 'primo', loadEl);
     const area = loadEl.querySelector('#primo-results-area');
-    const pubmedLink = isMedical ? `<a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanQ)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🏥 Search PubMed</a>` : '';
-    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Explore more sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Search Consensus</a>${pubmedLink}</div></div>`;
+    const pubmedBtn = isMedical ? `<button class="fq" onclick="doSearchNew('${sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer">🏥 Search PubMed</button>` : '';
+    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="fq" onclick="doSearchNew('${sid}','consensus')" style="padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #f9a8d4;cursor:pointer">🔬 Search Consensus</button>${pubmedBtn}<button class="fq" onclick="doSearchNew('${sid}','scholar')" style="padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #a5b4fc;cursor:pointer">🎓 Scholar Gateway</button></div></div>`;
   } else {
-    // ARTICLES/RESOURCES → search PRIMO directly, show Consensus + PubMed as links
+    // ARTICLES/RESOURCES → search PRIMO directly, show MCP search buttons
     loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="scard-title">🔍 ${natural||explanation} ${badge()}</div><div class="bool-str">${bool}</div>${buildSearchCard(bool,explanation,corrected,msg,yf,yt,pr,oa,false)}<div style="margin-top:10px;font-size:.8rem;color:var(--mu)"><div class="typing"><span></span><span></span><span></span></div> Searching PRIMO…</div><div id="primo-results-area"></div></div>`;
     cm.scrollTop=cm.scrollHeight;
     await doSearchSource(sid, 'primo', loadEl);
     const area = loadEl.querySelector('#primo-results-area');
-    const pubmedLink = isMedical ? `<a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanQ)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🏥 Search PubMed</a>` : '';
-    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Search Consensus</a>${pubmedLink}</div></div>`;
+    const pubmedBtn = isMedical ? `<button class="fq" onclick="doSearchNew('${sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer">🏥 Search PubMed</button>` : '';
+    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="fq" onclick="doSearchNew('${sid}','consensus')" style="padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #f9a8d4;cursor:pointer">🔬 Search Consensus</button>${pubmedBtn}<button class="fq" onclick="doSearchNew('${sid}','scholar')" style="padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #a5b4fc;cursor:pointer">🎓 Scholar Gateway</button></div></div>`;
   }
   chatHist.push({role:'assistant',content:`Search: ${natural||explanation}. Boolean: ${bool}`});
   logToAdmin(msg,'search');
@@ -634,9 +634,11 @@ async function doSearchSource(sid, source, loadEl) {
     if (source === 'primo') {
       data = await searchPRIMO(sp.q, {pr:sp.pr, oa:sp.oa, yf:sp.yf, yt:sp.yt, limit:5});
     } else {
+      // MCP sources (PubMed, Consensus, Scholar Gateway) work best with natural language
+      const queryForMCP = sp.orig || sp.q;
       const r = await fetch(RAG_URL+'/search', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({query:sp.q, source, limit:5, peer_reviewed:sp.pr, open_access:sp.oa, year_from:sp.yf, year_to:sp.yt})
+        body: JSON.stringify({query:queryForMCP, source, limit:5, peer_reviewed:sp.pr, open_access:sp.oa, year_from:sp.yf, year_to:sp.yt})
       });
       data = await r.json();
     }
