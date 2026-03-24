@@ -598,6 +598,7 @@ async function fullSearch(msg, chatHist, cm) {
     if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Search Consensus</a>${pubmedLink}</div></div>`;
   }
   chatHist.push({role:'assistant',content:`Search: ${natural||explanation}. Boolean: ${bool}`});
+  logToAdmin(msg,'search');
   cm.scrollTop=cm.scrollHeight;
 }
 
@@ -744,6 +745,14 @@ function clearChat(){
 loadBotConfig().then(() => {
   document.getElementById('chatMsgs').innerHTML = getWelcomeHTML();
 });
+// Log every query to Cloudflare D1 analytics
+function logToAdmin(question, tool, resultCount=0, error=null) {
+  fetch(W + '/log', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({question, tool, model: activeModel, response_time: 0, result_count: resultCount, error})
+  }).catch(() => {}); // fire and forget
+}
+
 async function sendChat(){
   const inp=document.getElementById('chatIn');const msg=inp.value.trim();if(!msg)return;
   // Check maintenance mode
@@ -757,12 +766,12 @@ async function sendChat(){
 
   // 1. FAQ match (instant, free)
   const faq = FAQ_KB.find(f => f.q.test(msg));
-  if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); showFollowUps('library'); return; }
+  if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
 
   // 2. Database mention
   if(isDBQuery(msg)){
     addMsg('bot',`For all Khalifa University Library databases: <a href="${ERESOURCES}" target="_blank"><strong>library.ku.ac.ae/eresources</strong></a> ${badge()}`);
-    chatHist.push({role:'assistant',content:'See eresources'}); showFollowUps('library'); return;
+    chatHist.push({role:'assistant',content:'See eresources'}); logToAdmin(msg,'database',1); showFollowUps('library'); return;
   }
 
   // 3. Subject mapping
@@ -773,7 +782,7 @@ async function sendChat(){
       return db ? `<a href="${db.url}" target="_blank" style="color:var(--t)">${d}</a>` : d;
     }).join(' · ');
     addMsg('bot',`For <strong>${subj.subject}</strong>, I recommend these databases: ${dbLinks}<br><br>Browse all at <a href="${ERESOURCES}" target="_blank">library.ku.ac.ae/eresources</a> ${badge()}`);
-    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); showFollowUps('search'); return;
+    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); logToAdmin(msg,'subject_map',subj.databases.length); showFollowUps('search'); return;
   }
 
   // 4. Generic "find articles/books"
@@ -834,19 +843,19 @@ async function sendChat(){
       try {
         const ragAnswer = await callRAG(msg);
         chatHist.push({role:'assistant',content:ragAnswer});
-        addBotStreamed(ragAnswer+' '+badge()+' <span class="model-badge" style="background:#E1F5EE;color:#0F6E56">RAG</span>'); showFollowUps('library');
+        addBotStreamed(ragAnswer+' '+badge()+' <span class="model-badge" style="background:#E1F5EE;color:#0F6E56">RAG</span>'); logToAdmin(msg,'rag',1); showFollowUps('library');
       } catch(ragErr) {
         console.warn('RAG failed, using LLM:', ragErr.message);
         const reply=await callLLM({system:LIB_SYS,messages:chatHist,max_tokens:300});
         chatHist.push({role:'assistant',content:reply});
-        addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('library');
+        addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_library',1); showFollowUps('library');
       }
     } else if(intent==='clarify'){
       const topic=msg.replace(/\b(what is|tell me about|explain|about|i want to know|can you tell me|could you explain)\b/gi,'').trim()||msg;
       addMsg('bot',`I can help with <strong>${topic}</strong>! What would you like? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find library resources on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find in Khalifa University Library</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation</button></div>`);
       chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
+      logToAdmin(msg,'clarify');
     } else {
-      // General/topic question — ask user what they want before answering
       const topicMatch = msg.match(/\b(?:about|on|regarding|related to)\s+(.+)/i);
       const topic = topicMatch ? topicMatch[1].replace(/[?.!]/g,'').trim() : msg.replace(/\b(what is|tell me|explain|describe|how does|how do|how is|how are|what are|who is|who are)\b/gi,'').trim() || msg;
       const isDirectQuestion = /^(what|how|why|when|where|who|which|is |are |do |does |can |could |should )/i.test(msg);
@@ -866,16 +875,16 @@ async function sendChat(){
               html += '</div>';
             }
             chatHist.push({role:'assistant',content:ws.text});
-            addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); showFollowUps('general');
+            addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); logToAdmin(msg,'web_search',ws.sources.length); showFollowUps('general');
           } catch(wsErr) {
             const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
             chatHist.push({role:'assistant',content:reply});
-            addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('general');
+            addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
           }
         } else {
           const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
           chatHist.push({role:'assistant',content:reply});
-          addBotStreamed(fmt(reply)+' '+badge()); showFollowUps('general');
+          addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
         }
       }
     }
