@@ -587,7 +587,7 @@ async function fullSearch(msg, chatHist, cm) {
     await doSearchSource(sid, 'primo', loadEl);
     const area = loadEl.querySelector('#primo-results-area');
     const pubmedBtn = isMedical ? `<button class="fq" onclick="doSearchNew('${sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer">🏥 Search PubMed</button>` : '';
-    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Go to Consensus and search</a>${pubmedBtn}<button class="fq" onclick="doSearchNew('${sid}','scholar')" style="padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #a5b4fc;cursor:pointer">🎓 Search Semantic Scholar</button></div></div>`;
+    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <span style="font-size:.72rem;color:var(--mu)">(account may be required for some)</span><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${pubmedBtn}<a href="https://www.semanticscholar.org/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🎓 Go to Semantic Scholar and search</a><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Go to Consensus and search</a><a href="https://www.perplexity.ai/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#f5f3ff;color:#5b21b6;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔎 Go to Perplexity and search</a></div></div>`;
   } else {
     // ARTICLES/RESOURCES → search PRIMO directly
     loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="scard-title">🔍 ${natural||explanation} ${badge()}</div><div class="bool-str">${bool}</div>${buildSearchCard(bool,explanation,corrected,msg,yf,yt,pr,oa,false)}<div style="margin-top:10px;font-size:.8rem;color:var(--mu)"><div class="typing"><span></span><span></span><span></span></div> Searching PRIMO…</div><div id="primo-results-area"></div></div>`;
@@ -595,7 +595,7 @@ async function fullSearch(msg, chatHist, cm) {
     await doSearchSource(sid, 'primo', loadEl);
     const area = loadEl.querySelector('#primo-results-area');
     const pubmedBtn = isMedical ? `<button class="fq" onclick="doSearchNew('${sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer">🏥 Search PubMed</button>` : '';
-    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Go to Consensus and search</a>${pubmedBtn}<button class="fq" onclick="doSearchNew('${sid}','scholar')" style="padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #a5b4fc;cursor:pointer">🎓 Search Semantic Scholar</button></div></div>`;
+    if(area) area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources: <span style="font-size:.72rem;color:var(--mu)">(account may be required for some)</span><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${pubmedBtn}<a href="https://www.semanticscholar.org/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🎓 Go to Semantic Scholar and search</a><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Go to Consensus and search</a><a href="https://www.perplexity.ai/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#f5f3ff;color:#5b21b6;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔎 Go to Perplexity and search</a></div></div>`;
   }
   chatHist.push({role:'assistant',content:`Search: ${natural||explanation}. Boolean: ${bool}`});
   logToAdmin(msg,'search');
@@ -671,8 +671,8 @@ async function doSearchSource(sid, source, loadEl) {
 // =================================================================
 const DB_LIST=['sciencedirect','ieee','scopus','web of science','springer','nature journal','wiley','taylor francis','pubmed','embase','cinahl','clinicalkey','cochrane','uptodate','acm digital','scifinder','scival','jstor','proquest','emerald','knovel','ebsco','elsevier','arxiv','zendy','mdpi','asme','asce','astm','aiaa','aip','aps journal','medline','database','e-resource','eresource'];
 function isDBQuery(msg){const l=msg.toLowerCase();return DB_LIST.some(d=>l.includes(d));}
-const SEARCH_RE=/\b(find|search for|look for|show me|get me|i need|i want)\b.*(article|book|paper|journal|research|literature|publication|library resources)/i;
-const LIBRARY_RE=/room|booking|reserve|hours|open|closed|ill|interlibrary|loan|account|fine|fee|renew|return|borrow|orcid|khazna|open access|publish|apc|newsletter|tour|visit|alumni|ask a librarian|contact/i;
+const SEARCH_RE=/\b(find|search for|look for|show me|get me|i need|i want)\b.*(article|book|paper|journal|research|literature|publication|library resources|library databases|databases & resources)/i;
+const LIBRARY_RE=/room|booking|reserve|hours|open|closed|ill|interlibrary|loan|account|fine|fee|renew|return|borrow|orcid|khazna|open access|publish|apc|newsletter|tour|visit|alumni|ask a librarian|contact|library information about|library services/i;
 
 async function routeQuery(msg,history){
   if(isDBQuery(msg))return'library';
@@ -852,40 +852,31 @@ async function sendChat(){
       }
     } else if(intent==='clarify'){
       const topic=msg.replace(/\b(what is|tell me about|explain|about|i want to know|can you tell me|could you explain)\b/gi,'').trim()||msg;
-      addMsg('bot',`I can help with <strong>${topic}</strong>! What would you like? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find library resources on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find in Khalifa University Library</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation</button></div>`);
+      addMsg('bot',`I can help with <strong>${topic}</strong>! What would you like? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find articles and books on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Search library databases & resources</button><button onclick="chip('Library information about ${topic}')" style="padding:8px 12px;background:#E1F5EE;color:#0F6E56;border:1.5px solid #6ee7b7;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🏛️ Library services & information</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation (AI knowledge)</button></div>`);
       chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
       logToAdmin(msg,'clarify');
     } else {
-      const topicMatch = msg.match(/\b(?:about|on|regarding|related to)\s+(.+)/i);
-      const topic = topicMatch ? topicMatch[1].replace(/[?.!]/g,'').trim() : msg.replace(/\b(what is|tell me|explain|describe|how does|how do|how is|how are|what are|who is|who are)\b/gi,'').trim() || msg;
-      const isDirectQuestion = /^(what|how|why|when|where|who|which|is |are |do |does |can |could |should )/i.test(msg);
-
-      if (isDirectQuestion && topic.length > 3) {
-        addMsg('bot',`I can help with <strong>${topic}</strong>! ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find library resources on ${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find in Khalifa University Library</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation (AI knowledge)</button></div>`);
-        chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
-      } else {
-        // Short or non-topic query — answer directly
-        if (activeModel === 'claude') {
-          try {
-            const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
-            let html = fmt(ws.text);
-            if (ws.sources.length > 0) {
-              html += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
-              html += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
-              html += '</div>';
-            }
-            chatHist.push({role:'assistant',content:ws.text});
-            addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); logToAdmin(msg,'web_search',ws.sources.length); showFollowUps('general');
-          } catch(wsErr) {
-            const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
-            chatHist.push({role:'assistant',content:reply});
-            addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
+      // General question — LLM decided it's general, answer directly
+      if (activeModel === 'claude') {
+        try {
+          const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
+          let html = fmt(ws.text);
+          if (ws.sources.length > 0) {
+            html += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+            html += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
+            html += '</div>';
           }
-        } else {
+          chatHist.push({role:'assistant',content:ws.text});
+          addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); logToAdmin(msg,'web_search',ws.sources.length); showFollowUps('general');
+        } catch(wsErr) {
           const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
           chatHist.push({role:'assistant',content:reply});
           addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
         }
+      } else {
+        const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
+        chatHist.push({role:'assistant',content:reply});
+        addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
       }
     }
   }catch(e){
@@ -942,7 +933,7 @@ function showFollowUps(intent){
   const cm=document.getElementById('chatMsgs');
   const qs=intent==='search'?['Make it peer reviewed','Limit to 2020 onwards','Find books instead']:
     intent==='library'?['How do I access databases?','What are the library hours?','Reserve a room']:
-    ['Find library resources on this topic','What databases cover this?','General explanation'];
+    ['Search library databases & resources','Library services & information','General explanation'];
   const d=document.createElement('div');d.className='followups';
   d.innerHTML=qs.map(q=>`<button class="fq" onclick="chip('${q}')">${q}</button>`).join('');
   cm.appendChild(d);cm.scrollTop=9999;
