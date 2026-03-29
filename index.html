@@ -165,7 +165,7 @@ header{background:var(--ku-blue);color:#fff;padding:10px 16px;display:flex;align
       </div></div>
     </div>
     <div class="chips" id="chips">
-      <div class="chip" onclick="chip('Find articles and books')">📚 Find Articles &amp; Books</div>
+      <div class="chip" onclick="askForSubject()">📚 Find Articles &amp; Books</div>
       <div class="chip" onclick="chip('What are the library hours?')">⏰ Library hours</div>
       <div class="chip" onclick="chip('How do I reserve a study room?')">🚪 Room booking</div>
       <div class="chip" onclick="chip('How do I publish open access at Khalifa University?')">📤 OA publishing support</div>
@@ -993,7 +993,7 @@ async function routeQuery(msg, history){
   // LLM classifier for anything else
   try{
     const ctx = history.slice(-4).map(m=>`${m.role}: ${m.content}`).join('\n');
-    const txt = await callLLM({messages:[{role:'user',content:`You are routing messages for the Khalifa University (KU) Library chatbot. KU = Khalifa University, Abu Dhabi.\n\nRouting rules:\n- "search": user wants to find books, articles, papers, or academic resources on a topic. Also use "search" when the user asks a research question about a topic (e.g. "what is the impact of X", "how does Y affect Z") since they likely want academic sources.\n- "library": user asks about library services, databases, hours, accounts, tools, staff, policies\n- "general": user wants a conversational factual answer and is NOT asking for academic sources\n- "clarify": ONLY use this if the message is genuinely ambiguous between ALL three above — prefer search/library/general over clarify\n\nContext:\n${ctx}\nMessage: "${msg}"\n\nReturn ONLY valid JSON: {"intent":"search|library|general|clarify"}`}],max_tokens:60});
+    const txt = await callLLM({messages:[{role:'user',content:`You are routing messages for the Khalifa University (KU) Library chatbot. KU = Khalifa University, Abu Dhabi.\n\nRouting rules:\n- "search": user CLEARLY wants to find books, articles, or papers on a SPECIFIC topic with an explicit search intent (e.g. "find articles on AI", "search for papers about climate change", "I need books on Python").\n- "library": user asks about library services, databases, hours, borrowing, accounts, tools, staff, policies, RefWorks, ORCID, ILL.\n- "general": user wants a factual/conversational answer and clearly does NOT want library resources (e.g. greetings, simple questions like "what is X" where the user just wants a quick explanation, not research papers).\n- "clarify": use when the user mentions a topic/subject WITHOUT a clear action — unclear if they want (a) articles/books, (b) library service info, or (c) a general explanation. When in doubt, return "clarify" — better to ask than to guess.\n\nExamples returning "clarify": "machine learning", "climate change", "what is blockchain", "tell me about CRISPR", "renewable energy", "I want to know about open access", "what is the impact of AI".\nExamples returning "search": "find papers on machine learning", "articles about climate change", "I need books on renewable energy".\nExamples returning "library": "how do I borrow a book", "what databases does KU have", "library hours", "how do I access Scopus".\n\nContext:\n${ctx}\nMessage: "${msg}"\n\nReturn ONLY valid JSON: {"intent":"search|library|general|clarify"}`}],max_tokens:80});
     const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
     if(s===-1) return 'general';
     const intent = JSON.parse(txt.substring(s,e+1)).intent || 'general';
@@ -1016,7 +1016,7 @@ async function loadServerYear() {
 }
 
 let LIB_SYS=`You are the Khalifa University (KU) Library Assistant in Abu Dhabi, UAE. KU = Khalifa University, NOT Kuwait University. Answer in 2-3 sentences with links. Never mention proxy/on-campus/off-campus.\nHours: https://library.ku.ac.ae/hours | Rooms: https://library.ku.ac.ae/rooms/ | ILL: https://library.ku.ac.ae/ill/ | Account: https://khalifa.primo.exlibrisgroup.com/discovery/account?vid=971KUOSTAR_INST:KU | OA: https://library.ku.ac.ae/oa/ | Ask: https://library.ku.ac.ae/AskUs | E-resources: https://library.ku.ac.ae/eresources`;
-let GEN_SYS=`You are the Khalifa University Library Assistant, Abu Dhabi, UAE. KU = Khalifa University. Answer factually in 3-5 sentences. End with: "Would you like me to find books or articles on this from Khalifa University Library?"`;
+let GEN_SYS=`You are the Khalifa University Library Assistant, Abu Dhabi, UAE. KU = Khalifa University. Answer factually in 3-5 sentences. Only if the topic is clearly academic or researchable, add ONE sentence at the end offering to find library resources.`;
 
 async function loadBotConfig() {
   try {
@@ -1027,7 +1027,7 @@ async function loadBotConfig() {
       if (botConfig.bot_personality) {
         const extra = botConfig.custom_instructions ? '\n\nAdditional instructions: ' + botConfig.custom_instructions : '';
         LIB_SYS = botConfig.bot_personality + extra + '\nHours: https://library.ku.ac.ae/hours | Rooms: https://library.ku.ac.ae/rooms/ | ILL: https://library.ku.ac.ae/ill/ | Account: https://khalifa.primo.exlibrisgroup.com/discovery/account?vid=971KUOSTAR_INST:KU | OA: https://library.ku.ac.ae/oa/ | Ask: https://library.ku.ac.ae/AskUs | E-resources: https://library.ku.ac.ae/eresources';
-        GEN_SYS = botConfig.bot_personality + extra + '\nAnswer factually in 3-5 sentences. End with: "Would you like me to find books or articles on this from Khalifa University Library?"';
+        GEN_SYS = botConfig.bot_personality + extra + '\nAnswer factually in 3-5 sentences. Only if the topic is clearly academic or researchable, add ONE sentence at the end offering to find library resources.';
       }
       // Apply default model
       if (botConfig.default_model) switchModel(botConfig.default_model);
@@ -1200,9 +1200,10 @@ async function sendChat(){
         addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_library',1); showFollowUps('library');
       }
     } else if(intent==='clarify'){
-      const topic=msg.replace(/\b(what is|tell me about|explain|about|i want to know|can you tell me|could you explain)\b/gi,'').trim()||msg;
-      addMsg('bot',`I can help with <strong>${topic}</strong>! What would you like? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('${topic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find articles &amp; books on ${topic}</button><button onclick="chip('What are the library hours?')" style="padding:8px 12px;background:#E1F5EE;color:#0F6E56;border:1.5px solid #6ee7b7;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🏛️ Library services &amp; information</button><button onclick="chip('Give me a general explanation of ${topic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 General explanation</button></div>`);
-      chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
+      const topic=msg.replace(/\b(what is|what are|tell me about|explain|about|i want to know|can you tell me|could you explain|i want to learn|i am interested in)\b/gi,'').replace(/[?!.]+$/,'').trim()||msg;
+      const safeTopic = topic.replace(/'/g,"\'");
+      addMsg('bot',`Sure! Just to point you in the right direction — what would you like to do with <strong>${topic}</strong>? ${badge()}<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px"><button onclick="chip('Find articles and books on ${safeTopic}')" style="padding:8px 12px;background:var(--ku-blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">📚 Find academic articles &amp; books on this</button><button onclick="chip('What library services or databases are available for ${safeTopic}')" style="padding:8px 12px;background:#E1F5EE;color:#0F6E56;border:1.5px solid #6ee7b7;border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">🗄️ Which library databases cover this?</button><button onclick="chip('Give me a general explanation of ${safeTopic}')" style="padding:8px 12px;background:#f0f4f8;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:10px;cursor:pointer;font-weight:600;font-size:.8rem;text-align:left">💡 Explain this to me (general answer)</button></div>`);
+      chatHist.push({role:'assistant',content:`What would you like about ${topic}? I can find academic articles and books, suggest relevant databases, or give a general explanation.`});
       logToAdmin(msg,'clarify');
     } else {
       // General question — use multi-tool agent first, fall back to web search / LLM
@@ -1325,6 +1326,15 @@ async function addBotStreamed(html) {
 }
 function fmt(t){return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank">$1</a>').replace(/\n/g,'<br>');}
 function chip(t){document.getElementById('chatIn').value=t;sendChat();}
+
+// "Find Articles & Books" chip — ask for subject first instead of immediately searching
+function askForSubject(){
+  document.getElementById('chips').style.display='none';
+  addMsg('user','📚 Find Articles & Books');
+  addMsg('bot',`What subject or topic are you looking for? ${badge()}<br><span style="font-size:.78rem;color:var(--mu)">e.g. <em>"machine learning in healthcare"</em>, <em>"renewable energy UAE"</em>, <em>"structural engineering"</em></span>`);
+  chatHist.push({role:'assistant', content:'What subject or topic are you looking for? Type your topic and I will search for articles and books.'});
+  document.getElementById('chatIn').focus();
+}
 function showFollowUps(intent, originalMsg){
   const cm = document.getElementById('chatMsgs');
   const qs = intent==='search'
