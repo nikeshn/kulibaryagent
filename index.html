@@ -702,88 +702,113 @@ async function buildBoolean(query, history){
   const ctx = history.slice(-6).map(m=>`${m.role}: ${m.content}`).join('\n');
   const currentYear = serverYear;
 
-  // Pre-clean: strip common chat prefixes before sending to LLM
+  // Pre-clean: strip common chat prefixes
   const cleanedQuery = query
     .replace(/^(find articles and books on|find articles on|find books on|search for|look for|i want|i need|give me|show me)\s+/i, '')
     .trim();
 
-  const p = `You are a search query expert for Khalifa University Library PRIMO.
+  // === CALL 1: Spelling correction + metadata (simple, reliable) ===
+  const spellPrompt = `Fix ALL spelling mistakes in this library search query. Also extract year filters and search preferences.
 
-STEP 1 — Fix ALL spelling mistakes in the request.
-STEP 2 — Extract 2-4 key CONCEPTS from the corrected request.
-STEP 3 — For each concept, list 2-3 synonyms.
-STEP 4 — Combine with AND between concepts, OR between synonyms.
+Query: "${cleanedQuery}"
+Context: ${ctx}
 
-RULES for the "boolean" field:
-- MUST contain AND and OR operators
-- MUST use parentheses around synonym groups
-- MUST be keywords only — NO full sentences, NO "impact of X on Y" as-is
-- Each concept group: (primary term OR synonym1 OR synonym2)
-- 2-3 groups joined by AND
+Return ONLY valid JSON:
+{"corrected":"spell-fixed version of query","natural":"plain English description","year_from":"","year_to":"","peer_reviewed":false,"open_access":false,"explanation":"one sentence"}
 
-YEAR HANDLING:
+Rules:
 - "last 5 years" → year_from=${currentYear-5}, year_to=${currentYear}
 - "last 3 years" → year_from=${currentYear-3}, year_to=${currentYear}
 - "recent" → year_from=${currentYear-3}, year_to=${currentYear}
+- peer_reviewed: true if user asks for peer reviewed
+- open_access: true if user asks for open access`;
 
-EXAMPLES — study these carefully:
+  let corrected = cleanedQuery, natural = cleanedQuery, yearFrom = '', yearTo = '', peerReviewed = false, openAccess = false, explanation = '';
+  try {
+    const txt1 = await callLLM({messages:[{role:'user', content:spellPrompt}], max_tokens:200});
+    const s1 = txt1.indexOf('{'), e1 = txt1.lastIndexOf('}');
+    if(s1 !== -1) {
+      const r1 = JSON.parse(txt1.substring(s1, e1+1));
+      corrected = r1.corrected || cleanedQuery;
+      natural = r1.natural || corrected;
+      yearFrom = r1.year_from || '';
+      yearTo = r1.year_to || '';
+      peerReviewed = !!r1.peer_reviewed;
+      openAccess = !!r1.open_access;
+      explanation = r1.explanation || '';
+    }
+  } catch(e) { corrected = cleanedQuery; }
 
-Input: "impact of demonetization on Indian economy"
-Concepts: [demonetization, Indian economy, economic impact]
-Output boolean: (demonetization OR "currency demonetisation" OR "banknote ban") AND ("Indian economy" OR India OR GDP) AND (impact OR effect OR consequence)
+  // === CALL 2: Boolean building from corrected query (focused task) ===
+  const boolPrompt = `Convert this search topic into a PRIMO Boolean query.
 
-Input: "machine learning in healthcare"
-Concepts: [machine learning, healthcare]
-Output boolean: ("machine learning" OR "deep learning" OR "artificial intelligence") AND (healthcare OR "clinical" OR "medical" OR "health informatics")
+Topic: "${corrected}"
 
-Input: "global warming UAE agriculture"
-Concepts: [global warming, UAE, agriculture]
-Output boolean: ("global warming" OR "climate change") AND (UAE OR "United Arab Emirates") AND (agriculture OR "food security" OR "crop yield")
+Instructions:
+1. Identify the main concepts (ignore connecting words like "of", "on", "in", "the")
+2. For each concept, add 1-2 synonyms
+3. Wrap each concept group in parentheses
+4. Join groups with AND
 
-Input: "renewable energy adoption developing countries"
-Concepts: [renewable energy, adoption, developing countries]
-Output boolean: ("renewable energy" OR "solar energy" OR "wind energy") AND (adoption OR implementation OR "energy transition") AND ("developing countries" OR "emerging economies")
+Output format: (concept1 OR synonym1) AND (concept2 OR synonym2) AND (concept3 OR synonym3)
 
-Context: ${ctx}
-Request: "${cleanedQuery}"
+Examples:
+Topic: "impact of demonetization on Indian economy"
+Output: (demonetization OR "currency demonetisation" OR "banknote ban") AND ("Indian economy" OR India OR GDP) AND (impact OR effect OR consequence)
 
-Return ONLY this exact JSON — no markdown, no extra text:
-{"corrected":"full corrected natural language version","boolean":"(term1 OR synonym1) AND (term2 OR synonym2)","natural":"plain English: what this search is for","year_from":"","year_to":"","peer_reviewed":false,"open_access":false,"explanation":"one sentence"}`;
+Topic: "machine learning in healthcare"
+Output: ("machine learning" OR "deep learning" OR AI) AND (healthcare OR clinical OR medical)
 
-  const txt = await callLLM({messages:[{role:'user', content:p}], max_tokens:700});
-  const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-  if(s === -1) throw new Error('no_json');
-  const result = JSON.parse(txt.substring(s, e+1));
+Topic: "global warming effects on UAE agriculture"
+Output: ("global warming" OR "climate change") AND (UAE OR "United Arab Emirates") AND (agriculture OR farming OR "food security")
 
-  // Validate boolean — must have AND or OR operators and parentheses
-  // If LLM returned a plain sentence, build a basic Boolean from key terms
-  const hasOperators = /\b(AND|OR)\b/.test(result.boolean);
-  const hasParens = result.boolean.includes('(');
+Topic: "renewable energy solar adoption"
+Output: ("renewable energy" OR "solar energy" OR "clean energy") AND (adoption OR implementation OR deployment)
 
-  if (!hasOperators || !hasParens) {
-    // Fallback: extract key terms from corrected query and build basic Boolean
-    const corrected = result.corrected || cleanedQuery;
-    // Remove stop words and split into terms
-    const stopWords = /^(of|on|in|the|a|an|and|or|for|to|with|by|from|at|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|shall|can|its|their|this|that|these|those|about|impact|effect|role|influence)$/i;
-    const terms = corrected.split(/\s+/).filter(t => t.length > 2 && !stopWords.test(t));
+Topic: "${corrected}"
+Output:`;
 
-    if (terms.length >= 2) {
-      // Group terms into 2-3 concept groups
-      const mid = Math.ceil(terms.length / 2);
-      const group1 = terms.slice(0, mid).join(' OR ');
-      const group2 = terms.slice(mid).join(' OR ');
-      result.boolean = group2 ? `(${group1}) AND (${group2})` : `(${group1})`;
+  let boolean = '';
+  try {
+    const txt2 = await callLLM({messages:[{role:'user', content:boolPrompt}], max_tokens:200});
+    // Extract just the Boolean — it's the last line or the whole response
+    boolean = txt2.trim()
+      .split('\n').pop()  // take last line in case there's preamble
+      .replace(/^(Output:|Boolean:|Result:)\s*/i, '')
+      .trim();
+  } catch(e) { boolean = ''; }
+
+  // Validate — must have AND/OR and parentheses
+  const isValidBoolean = /\b(AND|OR)\b/.test(boolean) && boolean.includes('(');
+
+  if (!isValidBoolean) {
+    // Build Boolean programmatically from corrected query
+    // Keep multi-word phrases together, remove stop words
+    const stopRE = /^(of|on|in|the|a|an|and|or|for|to|with|by|from|at|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|its|this|that|these|those|about|impact|effect|role|influence|importance|use|application|study|analysis|review)$/i;
+
+    // Extract meaningful phrases — keep consecutive non-stop words together
+    const words = corrected.split(/\s+/);
+    const concepts = [];
+    let phrase = [];
+    for (const w of words) {
+      if (!stopRE.test(w) && w.length > 2) {
+        phrase.push(w);
+      } else {
+        if (phrase.length > 0) { concepts.push(phrase.join(' ')); phrase = []; }
+      }
+    }
+    if (phrase.length > 0) concepts.push(phrase.join(' '));
+
+    if (concepts.length >= 2) {
+      boolean = concepts.map(c => `"${c}"`).join(' AND ');
+    } else if (concepts.length === 1) {
+      boolean = `"${concepts[0]}"`;
     } else {
-      result.boolean = corrected; // last resort
+      boolean = corrected;
     }
   }
 
-  // Safety: remove any instruction text that slipped through
-  if(/find articles|search for|look for|i want|i need/i.test(result.boolean)) {
-    result.boolean = result.corrected || cleanedQuery;
-  }
-
-  return result;
+  return { corrected, boolean, natural, year_from: yearFrom, year_to: yearTo, peer_reviewed: peerReviewed, open_access: openAccess, explanation };
 }
 
 // =================================================================
