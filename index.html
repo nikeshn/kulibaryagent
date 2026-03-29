@@ -406,9 +406,7 @@ async function callRAG(question) {
   if (data.error && !data.answer) throw new Error(data.error);
   let html = fmt(data.answer);
   if (data.sources && data.sources.length > 0) {
-    html += '<div style="margin-top:8px;font-size:.75rem;color:var(--mu)"><strong>Sources:</strong> ';
-    html += data.sources.map(s => s.source ? `<a href="${s.source}" target="_blank" style="color:var(--t)">${s.title || s.source}</a>` : s.title).join(' · ');
-    html += '</div>';
+    html += '<div style="margin-top:8px;font-size:.75rem;color:var(--mu)"><strong>Source:</strong> <a href="https://library.ku.ac.ae/" target="_blank" style="color:var(--t)">Khalifa University Library</a></div>';
   }
   if (data.model_used && data.model_used !== model) {
     html += ` <span style="font-size:.66rem;color:var(--mu)">(used ${data.model_used})</span>`;
