@@ -703,57 +703,86 @@ async function buildBoolean(query, history){
   const currentYear = serverYear;
 
   // Pre-clean: strip common chat prefixes before sending to LLM
-  // This handles recovery button queries like "Find articles and books on X"
   const cleanedQuery = query
     .replace(/^(find articles and books on|find articles on|find books on|search for|look for|i want|i need|give me|show me)\s+/i, '')
     .trim();
 
-  const p = `You are a search query expert for Khalifa University (KU) Library PRIMO in Abu Dhabi, UAE.
+  const p = `You are a search query expert for Khalifa University Library PRIMO.
 
-TASK: Given the user's request, do TWO things:
-1. CORRECT ALL SPELLING MISTAKES — fix every misspelled word before doing anything else
-2. BUILD a Boolean search query using the corrected words
+STEP 1 — Fix ALL spelling mistakes in the request.
+STEP 2 — Extract 2-4 key CONCEPTS from the corrected request.
+STEP 3 — For each concept, list 2-3 synonyms.
+STEP 4 — Combine with AND between concepts, OR between synonyms.
 
-CURRENT YEAR: ${currentYear}
+RULES for the "boolean" field:
+- MUST contain AND and OR operators
+- MUST use parentheses around synonym groups
+- MUST be keywords only — NO full sentences, NO "impact of X on Y" as-is
+- Each concept group: (primary term OR synonym1 OR synonym2)
+- 2-3 groups joined by AND
+
+YEAR HANDLING:
 - "last 5 years" → year_from=${currentYear-5}, year_to=${currentYear}
-- "last 3 years" → year_from=${currentYear-3}, year_to=${currentYear}  
+- "last 3 years" → year_from=${currentYear-3}, year_to=${currentYear}
 - "recent" → year_from=${currentYear-3}, year_to=${currentYear}
-- Always use 4-digit years, never relative words
 
-BOOLEAN RULES:
-- Use OR for synonyms: ("global warming" OR "climate change")
-- Use AND to combine concepts: ("global warming" OR "climate change") AND (agriculture OR "food security")
-- Use quotes for exact phrases
-- Keep it to 2-3 concept groups max — don't over-complicate
-- The "boolean" field must be KEYWORDS ONLY — never include "find articles on", "search for", or any instruction text
+EXAMPLES — study these carefully:
 
-EXAMPLES:
-Request: "impppact of globbal warming on UAE agriculture" 
-→ corrected: "impact of global warming on UAE agriculture"
-→ boolean: ("global warming" OR "climate change") AND (UAE OR "United Arab Emirates") AND (agriculture OR "food security" OR "crop yield")
+Input: "impact of demonetization on Indian economy"
+Concepts: [demonetization, Indian economy, economic impact]
+Output boolean: (demonetization OR "currency demonetisation" OR "banknote ban") AND ("Indian economy" OR India OR GDP) AND (impact OR effect OR consequence)
 
-Request: "machine lerning in helthcare"
-→ corrected: "machine learning in healthcare"  
-→ boolean: ("machine learning" OR "deep learning" OR "artificial intelligence") AND (healthcare OR "clinical" OR "medical")
+Input: "machine learning in healthcare"
+Concepts: [machine learning, healthcare]
+Output boolean: ("machine learning" OR "deep learning" OR "artificial intelligence") AND (healthcare OR "clinical" OR "medical" OR "health informatics")
 
-Request: "find articles and books on impact of demonetisation indian economy"
-→ corrected: "impact of demonetization on Indian economy"
-→ boolean: (demonetization OR "currency reform" OR "demonetisation") AND ("Indian economy" OR India OR GDP)
+Input: "global warming UAE agriculture"
+Concepts: [global warming, UAE, agriculture]
+Output boolean: ("global warming" OR "climate change") AND (UAE OR "United Arab Emirates") AND (agriculture OR "food security" OR "crop yield")
+
+Input: "renewable energy adoption developing countries"
+Concepts: [renewable energy, adoption, developing countries]
+Output boolean: ("renewable energy" OR "solar energy" OR "wind energy") AND (adoption OR implementation OR "energy transition") AND ("developing countries" OR "emerging economies")
 
 Context: ${ctx}
 Request: "${cleanedQuery}"
 
-Return ONLY raw JSON (no markdown, no explanation):
-{"corrected":"spell-corrected version of request","boolean":"(A OR B) AND (C OR D)","natural":"plain English description of search","year_from":"","year_to":"","peer_reviewed":false,"open_access":false,"explanation":"one sentence summary"}`;
+Return ONLY this exact JSON — no markdown, no extra text:
+{"corrected":"full corrected natural language version","boolean":"(term1 OR synonym1) AND (term2 OR synonym2)","natural":"plain English: what this search is for","year_from":"","year_to":"","peer_reviewed":false,"open_access":false,"explanation":"one sentence"}`;
 
-  const txt = await callLLM({messages:[{role:'user', content:p}], max_tokens:600});
+  const txt = await callLLM({messages:[{role:'user', content:p}], max_tokens:700});
   const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
   if(s === -1) throw new Error('no_json');
   const result = JSON.parse(txt.substring(s, e+1));
-  // Safety: if boolean still contains instruction text, fall back to corrected query
+
+  // Validate boolean — must have AND or OR operators and parentheses
+  // If LLM returned a plain sentence, build a basic Boolean from key terms
+  const hasOperators = /\b(AND|OR)\b/.test(result.boolean);
+  const hasParens = result.boolean.includes('(');
+
+  if (!hasOperators || !hasParens) {
+    // Fallback: extract key terms from corrected query and build basic Boolean
+    const corrected = result.corrected || cleanedQuery;
+    // Remove stop words and split into terms
+    const stopWords = /^(of|on|in|the|a|an|and|or|for|to|with|by|from|at|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|shall|can|its|their|this|that|these|those|about|impact|effect|role|influence)$/i;
+    const terms = corrected.split(/\s+/).filter(t => t.length > 2 && !stopWords.test(t));
+
+    if (terms.length >= 2) {
+      // Group terms into 2-3 concept groups
+      const mid = Math.ceil(terms.length / 2);
+      const group1 = terms.slice(0, mid).join(' OR ');
+      const group2 = terms.slice(mid).join(' OR ');
+      result.boolean = group2 ? `(${group1}) AND (${group2})` : `(${group1})`;
+    } else {
+      result.boolean = corrected; // last resort
+    }
+  }
+
+  // Safety: remove any instruction text that slipped through
   if(/find articles|search for|look for|i want|i need/i.test(result.boolean)) {
     result.boolean = result.corrected || cleanedQuery;
   }
+
   return result;
 }
 
@@ -824,7 +853,8 @@ async function fullSearch(msg, chatHist, cm) {
     area.innerHTML = `<div style="font-size:.82rem;color:var(--mu);margin-top:8px">${res.error ? 'PRIMO error: '+res.error : 'No results found. Try refining your search.'}</div>`;
   }
 
-  // PubMed — separate, medical only, gets PRIMO keyword
+  // PubMed — separate, medical only; doSearchNew passes sp.orig (natural language) to HF Space backend
+  // "View all in PubMed" link (inside doSearchSource) uses sp.bool — PubMed supports full Boolean
   const pubmedBtn = res.isMedical ? `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer;width:100%">🏥 Also search PubMed (medical literature)</button></div>` : '';
   // AI tools panel — natural language query for all tools, PRIMO keyword for PRIMO AI
   const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
@@ -887,7 +917,9 @@ async function doSearchSource(sid, source, loadEl) {
         html += `<div style="text-align:center;margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem"><a href="${mkURL(sp.bool,'Everything','MyInst_and_CI',[])}" target="_blank" style="color:var(--ku-blue);font-weight:700">View all ${tot.toLocaleString()} results in PRIMO →</a></div>`;
       }
       if (source === 'pubmed') {
-        html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#d1fae5;border-radius:10px;font-size:.82rem"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(sp.q)}" target="_blank" style="color:#065f46;font-weight:700">View all ${tot.toLocaleString()} results in PubMed →</a></div>`;
+        // PubMed supports full Boolean — use sp.bool for precise search
+        const pubmedQ = sp.bool || sp.q;
+        html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#d1fae5;border-radius:10px;font-size:.82rem"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(pubmedQ)}" target="_blank" style="color:#065f46;font-weight:700">View all ${tot.toLocaleString()} results in PubMed →</a></div>`;
       }
       if (source === 'scholar') {
         html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#e0e7ff;border-radius:10px;font-size:.82rem"><a href="https://www.semanticscholar.org/search?q=${encodeURIComponent(sp.orig||sp.q)}" target="_blank" style="color:#3730a3;font-weight:700">View all results in Semantic Scholar →</a></div>`;
@@ -1251,10 +1283,11 @@ async function doSearch(){
     html += `<div style="font-size:.78rem;color:var(--mu);margin-top:8px">${res.error ? 'PRIMO API: '+res.error : 'No results found.'}</div>`;
   }
 
-  // AI tools get corrected natural language; PRIMO AI + PubMed get keywords
+  // AI tools get corrected natural language; PRIMO AI gets primoKeyword; PubMed gets full Boolean
   html += buildAIToolsPanel(correctedQuery, primoKeyword);
   if (res.isMedical) {
-    html += `<div style="margin-top:8px"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(primoKeyword)}" target="_blank" style="display:block;padding:8px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:700;font-size:.8rem;text-align:center">🏥 Also search PubMed (medical literature) →</a></div>`;
+    // PubMed supports full Boolean syntax — pass res.bool directly
+    html += `<div style="margin-top:8px"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(res.bool)}" target="_blank" style="display:block;padding:8px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:700;font-size:.8rem;text-align:center">🏥 Also search PubMed (medical literature) →</a></div>`;
   }
   document.getElementById('sResults').innerHTML = html;
 }
