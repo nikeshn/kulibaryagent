@@ -57,6 +57,24 @@ header{background:var(--ku-blue);color:#fff;padding:10px 16px;display:flex;align
 .slink.art{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .slink.bk{background:#ede9fe;color:var(--ku-blue);border:1px solid #c4b5fd}
 .slink.ai{background:linear-gradient(135deg,var(--ku-gold),var(--ku-blue));color:#fff}
+/* AI TOOLS PANEL */
+.ai-panel{margin-top:10px;padding:12px;background:linear-gradient(135deg,#f0f4ff,#faf5ff);border-radius:12px;border:1px solid #c4b5fd}
+.ai-panel-title{font-size:.78rem;font-weight:800;color:#5b21b6;margin-bottom:2px;display:flex;align-items:center;gap:5px}
+.ai-panel-note{font-size:.68rem;color:var(--mu);margin-bottom:8px}
+.ai-tools-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.ai-tool-btn{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:9px;text-decoration:none;font-size:.75rem;font-weight:700;transition:all .2s;border:1.5px solid transparent}
+.ai-tool-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.ai-tool-btn .ai-tool-icon{font-size:1rem;flex-shrink:0}
+.ai-tool-btn .ai-tool-info{display:flex;flex-direction:column;min-width:0}
+.ai-tool-btn .ai-tool-name{font-size:.74rem;font-weight:700;white-space:nowrap}
+.ai-tool-btn .ai-tool-note{font-size:.62rem;font-weight:400;opacity:.8;white-space:nowrap}
+.ai-tool-btn.leapspace{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+.ai-tool-btn.scopus{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.ai-tool-btn.primoai{background:linear-gradient(135deg,#fef9c3,#ede9fe);color:#5b21b6;border-color:#c4b5fd}
+.ai-tool-btn.semscholar{background:#f0fdf4;color:#14532d;border-color:#bbf7d0}
+.ai-tool-btn.consensus{background:#fdf4ff;color:#86198f;border-color:#f0abfc}
+.ai-tool-btn.perplexity{background:#f5f3ff;color:#4c1d95;border-color:#ddd6fe}
+@media(max-width:480px){.ai-tools-grid{grid-template-columns:1fr}}
 .confirm-box{background:#f0f4f8;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.84rem;line-height:1.6;border-left:3px solid var(--ku-gold)}
 .confirm-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .cbtn{padding:7px 16px;border-radius:10px;border:none;cursor:pointer;font-size:.8rem;font-weight:700}
@@ -441,6 +459,58 @@ async function callRAG(question) {
 }
 
 // =================================================================
+// AGENT CALL (Batch 3: multi-tool agent endpoint)
+// Calls /agent on HF Space — classifies intent, runs tools, synthesises
+// =================================================================
+async function callAgent(question) {
+  const model = activeModel === 'claude' ? 'claude' : 'gpt';
+  const history = chatHist.slice(-6).map(m => ({ role: m.role, content: m.content }));
+  const r = await fetchWithRetry(RAG_URL + '/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, model, history })
+  });
+  document.getElementById('warm-msg')?.remove();
+  if (!r || !r.ok) throw new Error('Agent service unavailable');
+  const data = await r.json();
+  if (!data.answer) throw new Error(data.error || 'No answer from agent');
+
+  let html = fmt(data.answer);
+
+  // Show search results if agent found any
+  if (data.search_results && data.search_results.length > 0) {
+    const agentSid = 'AG' + Date.now();
+    window._primoResults[agentSid] = data.search_results;
+    html += `<div style="margin-top:10px;font-size:.82rem;font-weight:700;color:var(--ku-blue)">📄 Relevant results found:</div>`;
+    html += data.search_results.slice(0, 3).map((r, i) => renderResultCard(r, i, agentSid)).join('');
+  }
+
+  // Show tool badges
+  if (data.tools_used && data.tools_used.length > 0) {
+    const toolLabels = {
+      'get_library_info': '📚 KU Knowledge Base',
+      'PRIMO': '🔍 PRIMO',
+      'PubMed': '🏥 PubMed',
+      'Semantic Scholar': '🎓 Semantic Scholar',
+    };
+    const badges = data.tools_used
+      .map(t => `<span style="font-size:.66rem;padding:2px 7px;border-radius:8px;background:#e0e7ff;color:#3730a3;font-weight:600">${toolLabels[t]||t}</span>`)
+      .join(' ');
+    html += `<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">${badges}</div>`;
+  }
+
+  // Model + intent badge
+  const intentLabel = {
+    library_info: '🏛️ Library',
+    search_academic: '🔍 Academic',
+    search_medical: '🏥 Medical',
+    general: '💡 General'
+  }[data.intent] || '';
+  html += ` ${badge()} <span class="model-badge" style="background:#f0fdf4;color:#14532d">${intentLabel}</span>`;
+  return html;
+}
+
+// =================================================================
 // PRIMO API SEARCH
 // =================================================================
 async function searchPRIMO(query, opts={}) {
@@ -569,6 +639,47 @@ function buildSearchCard(bool,explanation,corrected,raw,yf,yt,pr,oa,ol){
 }
 
 // =================================================================
+// AI TOOLS PANEL
+// naturalQuery = original user question (full natural language)
+// primoKeyword = simplified keyword for PRIMO AI assistant
+// =================================================================
+function buildAIToolsPanel(naturalQuery, primoKeyword) {
+  const nq = encodeURIComponent(naturalQuery);
+  const pk = encodeURIComponent(primoKeyword);
+  const kuNote = 'KU email required';
+  return `<div class="ai-panel">
+    <div class="ai-panel-title">🤖 AI Tools for Your Query</div>
+    <div class="ai-panel-note">These AI tools search using your full question — sign in with <strong>firstname.lastname@ku.ac.ae</strong> where required</div>
+    <div class="ai-tools-grid">
+      <a class="ai-tool-btn leapspace" href="https://www.sciencedirect.com/leapspace?query=${nq}" target="_blank">
+        <span class="ai-tool-icon">🔬</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">LeapSpace</span><span class="ai-tool-note">ScienceDirect AI · ${kuNote}</span></span>
+      </a>
+      <a class="ai-tool-btn scopus" href="https://www-scopus-com.khalifa.idm.oclc.org/pages/ai?query=${nq}" target="_blank">
+        <span class="ai-tool-icon">🔭</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">Scopus AI</span><span class="ai-tool-note">Citation & AI search · ${kuNote}</span></span>
+      </a>
+      <a class="ai-tool-btn primoai" href="${AI_URL}${pk}" target="_blank">
+        <span class="ai-tool-icon">⭐</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">PRIMO AI Assistant</span><span class="ai-tool-note">KU Library discovery AI</span></span>
+      </a>
+      <a class="ai-tool-btn semscholar" href="https://www.semanticscholar.org/search?q=${nq}" target="_blank">
+        <span class="ai-tool-icon">🎓</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">Semantic Scholar</span><span class="ai-tool-note">200M+ free papers</span></span>
+      </a>
+      <a class="ai-tool-btn consensus" href="https://consensus.app/results/?q=${nq}" target="_blank">
+        <span class="ai-tool-icon">🧬</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">Consensus</span><span class="ai-tool-note">AI research synthesis</span></span>
+      </a>
+      <a class="ai-tool-btn perplexity" href="https://www.perplexity.ai/search?q=${nq}" target="_blank">
+        <span class="ai-tool-icon">🔎</span>
+        <span class="ai-tool-info"><span class="ai-tool-name">Perplexity</span><span class="ai-tool-note">AI web research</span></span>
+      </a>
+    </div>
+  </div>`;
+}
+
+// =================================================================
 // BOOLEAN BUILDER + PRIMO RESULTS FLOW
 // =================================================================
 async function buildBoolean(query,history){
@@ -654,8 +765,11 @@ async function fullSearch(msg, chatHist, cm) {
     area.innerHTML = `<div style="font-size:.82rem;color:var(--mu);margin-top:8px">${res.error ? 'PRIMO error: '+res.error : 'No results found. Try refining your search.'}</div>`;
   }
 
-  const pubmedBtn = res.isMedical ? `<button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer">🏥 Search PubMed</button>` : '';
-  area.innerHTML += `<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem">Search other scholarly sources:<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${pubmedBtn}<a href="https://www.semanticscholar.org/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🎓 Semantic Scholar</a><a href="https://consensus.app/results/?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔬 Consensus</a><a href="https://www.perplexity.ai/search?q=${encodeURIComponent(msg)}" target="_blank" style="display:inline-block;padding:6px 14px;background:#f5f3ff;color:#5b21b6;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem">🔎 Perplexity</a></div></div>`;
+  // PubMed — separate, medical only, gets PRIMO keyword
+  const pubmedBtn = res.isMedical ? `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer;width:100%">🏥 Also search PubMed (medical literature)</button></div>` : '';
+  // AI tools panel — natural language query for all tools, PRIMO keyword for PRIMO AI
+  const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
+  area.innerHTML += buildAIToolsPanel(msg, primoKeyword) + pubmedBtn;
 
   chatHist.push({role:'assistant', content:`Search: ${res.natural||res.explanation}. Boolean: ${res.bool}`});
   logToAdmin(msg, 'search');
@@ -899,29 +1013,35 @@ async function sendChat(){
   const generalExplainMatch = msg.match(/(?:give me a |provide a )?general (?:explanation|overview|summary|info|information) (?:of |about |on )?(.+)/i);
   if (generalExplainMatch) {
     const topic = generalExplainMatch[1].replace(/[?.!]/g,'').trim();
-    const tid2='ty'+Date.now();
-    const te2=document.createElement('div');te2.className='msg bot';te2.id=tid2;
-    te2.innerHTML=`<div class="av">🤖</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div>`;
-    cm.appendChild(te2);cm.scrollTop=cm.scrollHeight;
+    const tid2 = 'ty'+Date.now();
+    const te2 = document.createElement('div'); te2.className='msg bot'; te2.id=tid2;
+    te2.innerHTML = `<div class="av">🤖</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    cm.appendChild(te2); cm.scrollTop=cm.scrollHeight;
     try {
       let reply;
-      if (activeModel === 'claude') {
-        try {
-          const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
-          reply = fmt(ws.text);
-          if (ws.sources.length > 0) {
-            reply += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
-            reply += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
-            reply += '</div>';
-          }
-          reply += ' ' + badge() + ' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>';
-        } catch(e) { reply = fmt(await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:500})) + ' ' + badge(); }
-      } else {
-        reply = fmt(await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:500})) + ' ' + badge();
+      try {
+        // Use agent — it adds RAG context and tool awareness
+        reply = await callAgent(msg);
+      } catch(agentErr) {
+        console.warn('Agent failed for explain, falling back:', agentErr.message);
+        if (activeModel === 'claude') {
+          try {
+            const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
+            reply = fmt(ws.text);
+            if (ws.sources.length > 0) {
+              reply += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+              reply += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
+              reply += '</div>';
+            }
+            reply += ' ' + badge() + ' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>';
+          } catch(e) { reply = fmt(await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:500})) + ' ' + badge(); }
+        } else {
+          reply = fmt(await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:500})) + ' ' + badge();
+        }
       }
       document.getElementById(tid2)?.remove();
-      chatHist.push({role:'assistant',content:reply});
-      addBotStreamed(reply); showFollowUps('general');
+      chatHist.push({role:'assistant', content:reply});
+      addBotStreamed(reply); logToAdmin(msg,'agent',1); showFollowUps('general');
     } catch(e) { document.getElementById(tid2)?.remove(); addMsg('bot','⚠️ '+e.message); }
     return;
   }
@@ -956,27 +1076,36 @@ async function sendChat(){
       chatHist.push({role:'assistant',content:`What would you like about ${topic}? Library resources or a general explanation?`});
       logToAdmin(msg,'clarify');
     } else {
-      // General question — LLM decided it's general, answer directly
-      if (activeModel === 'claude') {
-        try {
-          const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
-          let html = fmt(ws.text);
-          if (ws.sources.length > 0) {
-            html += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
-            html += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
-            html += '</div>';
+      // General question — use multi-tool agent first, fall back to web search / LLM
+      try {
+        const agentAnswer = await callAgent(msg);
+        chatHist.push({role:'assistant', content:agentAnswer});
+        addBotStreamed(agentAnswer); logToAdmin(msg,'agent',1); showFollowUps('general');
+      } catch(agentErr) {
+        console.warn('Agent failed, falling back:', agentErr.message);
+        // Fallback: Claude web search or GPT
+        if (activeModel === 'claude') {
+          try {
+            const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
+            let html = fmt(ws.text);
+            if (ws.sources.length > 0) {
+              html += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+              html += ws.sources.slice(0, 4).map(s => `<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title || s.url}</a>`).join(' · ');
+              html += '</div>';
+            }
+            chatHist.push({role:'assistant', content:ws.text});
+            addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>');
+            logToAdmin(msg,'web_search',ws.sources.length); showFollowUps('general');
+          } catch(wsErr) {
+            const reply = await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:400});
+            chatHist.push({role:'assistant', content:reply});
+            addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
           }
-          chatHist.push({role:'assistant',content:ws.text});
-          addBotStreamed(html+' '+badge()+' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>'); logToAdmin(msg,'web_search',ws.sources.length); showFollowUps('general');
-        } catch(wsErr) {
-          const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
-          chatHist.push({role:'assistant',content:reply});
+        } else {
+          const reply = await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:400});
+          chatHist.push({role:'assistant', content:reply});
           addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
         }
-      } else {
-        const reply=await callLLM({system:GEN_SYS,messages:chatHist,max_tokens:300});
-        chatHist.push({role:'assistant',content:reply});
-        addBotStreamed(fmt(reply)+' '+badge()); logToAdmin(msg,'llm_general',1); showFollowUps('general');
       }
     }
   }catch(e){
@@ -1008,6 +1137,13 @@ async function doSearch(){
     html += res.results.map((r,i) => renderResultCard(r, i, res.sid)).join('');
   } else {
     html += `<div style="font-size:.78rem;color:var(--mu);margin-top:8px">${res.error ? 'PRIMO API: '+res.error : 'No results found.'}</div>`;
+  }
+  // AI tools panel — natural language query; PRIMO AI gets keyword
+  const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
+  html += buildAIToolsPanel(q, primoKeyword);
+  // PubMed — separate, medical only
+  if (res.isMedical) {
+    html += `<div style="margin-top:8px"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(primoKeyword)}" target="_blank" style="display:block;padding:8px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:700;font-size:.8rem;text-align:center">🏥 Also search PubMed (medical literature) →</a></div>`;
   }
   document.getElementById('sResults').innerHTML = html;
 }
