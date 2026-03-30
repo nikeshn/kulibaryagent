@@ -954,10 +954,20 @@ async function doSearchSource(sid, source, loadEl) {
 const DB_LIST=['sciencedirect','ieee','scopus','web of science','springer','nature journal','wiley','taylor francis','pubmed','embase','cinahl','clinicalkey','cochrane','uptodate','acm digital','scifinder','scival','jstor','proquest','emerald','knovel','ebsco','elsevier','arxiv','zendy','mdpi','asme','asce','astm','aiaa','aip','aps journal','medline','database','e-resource','eresource'];
 function isDBQuery(msg){const l=msg.toLowerCase();return DB_LIST.some(d=>l.includes(d));}
 
-// Explicit search intent — user clearly wants articles/books/papers
-const EXPLICIT_SEARCH_RE=/\b(find|search for|look for|show me|get me|give me|locate|recommend|suggest)\b.{0,50}(article|book|paper|journal|research|literature|publication|study|studies|sources?|databases?)/i;
+// ── Search intent detection ──
+// Block: library service questions about articles/books (not searching for them on a topic)
+const LIBRARY_SERVICE_RE=/\b(order|request|borrow|access|subscribe|purchase|buy|download|obtain|get.*through|ill|interlibrary|how do i get|how can i get|how to get|can i get.*from|library.*get|get.*from.*library|available.*library|library.*have|do you have|does.*library|what.*library.*have|remotely|off.?campus|from home|access.*database)\b/i;
+
+// Trigger: user wants articles/books ON a specific topic
+const TOPIC_SEARCH_RE=/\b(find|search|look for|show me|get me|give me|locate|i need|i want|i'd like|i am looking for|looking for|can i get|can you find|recommend|suggest|fetch)\b.{0,60}(articles?|papers?|books?|journals?|research|studies|publications?|literature)\b.{0,30}\b(on|about|regarding|related to|concerning|for|of)\b\s+\w/i;
 const CONTENT_FIRST_RE=/^(articles?|papers?|books?|journals?|studies|publications?|research)\s+(on|about|regarding|related to|concerning)\s+\S/i;
-const WANT_CONTENT_RE=/\b(find me|get me|i need|i want|i'd like|i am looking for|looking for)\s+(some\s+)?(articles?|papers?|books?|journals?|research|studies|publications?)\b/i;
+const SOME_ON_RE=/\b(some\s+)?(articles?|papers?|books?|research|studies)\s+(on|about|regarding|concerning)\s+\w/i;
+
+// Combined check: is this a topic search (not a library service question)?
+function isTopicSearch(msg) {
+  if (LIBRARY_SERVICE_RE.test(msg)) return false;
+  return TOPIC_SEARCH_RE.test(msg) || CONTENT_FIRST_RE.test(msg) || SOME_ON_RE.test(msg);
+}
 
 // =================================================================
 // GLOBAL STATE — restored (was accidentally deleted in refactor)
@@ -1057,6 +1067,16 @@ async function sendChat(){
   chatHist.push({role:'user',content:String(msg)});
   trimChatHist(); // Fix 13: keep history bounded
 
+  // 0. Context check — if the bot just asked for a subject/topic,
+  //    treat this reply as a direct search query immediately
+  const lastBotMsg = chatHist.slice(0,-1).reverse().find(m => m.role === 'assistant')?.content || '';
+  const wasAskingForSubject = /AWAITING_SUBJECT|what subject|what topic|type your topic|i will search for articles and books/i.test(lastBotMsg);
+  if (wasAskingForSubject && msg.trim().length > 1) {
+    const cm0 = document.getElementById('chatMsgs');
+    await fullSearch(msg, chatHist, cm0);
+    return;
+  }
+
   // 1. FAQ match (instant, free)
   const faq = FAQ_KB.find(f => f.q.test(msg));
   if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
@@ -1081,11 +1101,11 @@ async function sendChat(){
   // 4. Generic "find articles/books"
   if (/^i?\s*(want to |would like to )?(find|search|look for|need)\s*(some\s+)?(articles?|papers?)\s*$/i.test(msg)) {
     addMsg('bot',`What subject or topic would you like me to find articles on? ${badge()}<br><span style="font-size:.78rem;color:var(--mu)">e.g. <em>"AI in healthcare"</em>, <em>"renewable energy"</em></span>`);
-    chatHist.push({role:'assistant',content:'What topic?'}); return;
+    chatHist.push({role:'assistant',content:'AWAITING_SUBJECT: What topic would you like to find articles on?'}); return;
   }
   if (/^i?\s*(want to |would like to )?(find|search|look for|need)\s*(some\s+)?(books?|ebooks?)\s*$/i.test(msg)) {
     addMsg('bot',`What subject would you like me to find books on? ${badge()}<br><span style="font-size:.78rem;color:var(--mu)">e.g. <em>"data science"</em>, <em>"structural engineering"</em></span>`);
-    chatHist.push({role:'assistant',content:'What topic?'}); return;
+    chatHist.push({role:'assistant',content:'AWAITING_SUBJECT: What subject would you like to find books on?'}); return;
   }
 
   // 4b. "Give me a general explanation of X" — answer directly, no clarification
@@ -1138,7 +1158,7 @@ async function sendChat(){
 
   try{
     // ── STEP 1: Explicit search? Only if user clearly wants articles/books ──
-    if(EXPLICIT_SEARCH_RE.test(msg) || CONTENT_FIRST_RE.test(msg) || WANT_CONTENT_RE.test(msg)){
+    if(isTopicSearch(msg)){
       clearInterval(statusTimer); document.getElementById(tid)?.remove();
       await fullSearch(msg, chatHist, cm);
       return;
@@ -1298,7 +1318,7 @@ function askForSubject(){
   document.getElementById('chips').style.display='none';
   addMsg('user','📚 Find Articles & Books');
   addMsg('bot',`What subject or topic are you looking for? ${badge()}<br><span style="font-size:.78rem;color:var(--mu)">e.g. <em>"machine learning in healthcare"</em>, <em>"renewable energy UAE"</em>, <em>"structural engineering"</em></span>`);
-  chatHist.push({role:'assistant', content:'What subject or topic are you looking for? Type your topic and I will search for articles and books.'});
+  chatHist.push({role:'assistant', content:'AWAITING_SUBJECT: What subject or topic are you looking for? Type your topic and I will search for articles and books.'});
   document.getElementById('chatIn').focus();
 }
 function showFollowUps(intent, originalMsg){
