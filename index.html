@@ -1184,19 +1184,30 @@ async function sendChat(){
 
     // ── STEP 3: Not in library KB — ask user before using general LLM ──
     clearInterval(statusTimer); document.getElementById(tid)?.remove();
-    pendingLLMQuestion = msg;
-    const safeMsgQ = msg.replace(/'/g, "\'").substring(0, 150);
+    pendingLLMQuestion = msg; // store for buttons to use
+    const btnId = 'kb-'+Date.now();
     addMsg('bot', `I don't have specific information about this in the Khalifa University Library knowledge base. ${badge()}<br><br>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="answerFromLLM('${safeMsgQ}')"
-          style="padding:7px 14px;background:var(--ku-blue);color:#fff;border:none;border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer">
+      <div id="${btnId}" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button id="${btnId}-llm"
+          style="padding:8px 16px;background:var(--ku-blue);color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer">
           🤖 Yes, answer from general AI knowledge
         </button>
-        <button onclick="answerFindArticles('${safeMsgQ}')"
-          style="padding:7px 14px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer">
+        <button id="${btnId}-search"
+          style="padding:8px 16px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer">
           📚 Find articles &amp; books on this
         </button>
       </div>`);
+    // Attach event listeners after DOM insert (avoids string escaping issues)
+    setTimeout(() => {
+      document.getElementById(btnId+'-llm')?.addEventListener('click', () => {
+        document.getElementById(btnId).innerHTML = '<em style="font-size:.78rem;color:var(--mu)">Generating answer from general AI…</em>';
+        answerFromLLM(pendingLLMQuestion);
+      });
+      document.getElementById(btnId+'-search')?.addEventListener('click', () => {
+        document.getElementById(btnId).innerHTML = '<em style="font-size:.78rem;color:var(--mu)">Searching articles and books…</em>';
+        answerFindArticles(pendingLLMQuestion);
+      });
+    }, 100);
     chatHist.push({role:'assistant', content:'Not in library KB. Asked user: use general AI or find articles?'});
     logToAdmin(msg,'not_in_kb',0);
 
@@ -1308,7 +1319,7 @@ async function answerFromLLM(msg) {
 
   const tid4 = 'ty4'+Date.now();
   const te4 = document.createElement('div'); te4.className='msg bot'; te4.id=tid4;
-  const beeImg = document.querySelector('.hdr-logo img')?.src || '';
+  const beeImg = document.querySelector('.hdr-logo img')?.src || document.querySelector('.av img')?.src || '';
   te4.innerHTML = `<div class="av" style="background:transparent"><img src="${beeImg}" alt="LibBee" style="width:28px;height:28px;object-fit:contain;border-radius:50%"></div><div class="bub"><div class="typing"><span></span><span></span><span></span><span class="status-text">💭 Generating answer from general knowledge…</span></div></div>`;
   cm.appendChild(te4); cm.scrollTop=cm.scrollHeight;
 
