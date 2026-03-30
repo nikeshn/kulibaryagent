@@ -419,25 +419,37 @@ async function callClaudeWebSearch(messages, system) {
 // RAG KNOWLEDGE QUERY (via HuggingFace Space)
 // =================================================================
 // Fix 10: fetch with cold-start retry — HF free tier sleeps after inactivity
-async function fetchWithRetry(url, options, retries=2, delayMs=4000) {
+async function fetchWithRetry(url, options, retries=4, delayMs=8000) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const timeoutMs = attempt === 0 ? 30000 : 60000; // longer timeout on retries
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       const r = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeout);
+      // Success — remove warm-up message if shown
+      document.getElementById('warm-msg')?.remove();
       return r;
     } catch (e) {
-      if (attempt === retries) throw e;
-      // Show warming message on first retry
-      if (attempt === 0) {
-        const cm = document.getElementById('chatMsgs');
-        const warm = document.createElement('div');
+      if (attempt === retries) {
+        // All retries exhausted — remove warm-up message and throw
+        document.getElementById('warm-msg')?.remove();
+        throw e;
+      }
+      // Show / update warming message
+      const cm = document.getElementById('chatMsgs');
+      let warm = document.getElementById('warm-msg');
+      if (!warm) {
+        warm = document.createElement('div');
         warm.id = 'warm-msg';
         warm.className = 'msg bot';
-        warm.innerHTML = `<div class="av">⏳</div><div class="bub" style="font-size:.82rem;color:var(--mu)">The AI service is waking up — this may take 10–15 seconds on first use. Please wait…</div>`;
         cm?.appendChild(warm); cm && (cm.scrollTop = 9999);
       }
+      const waitSecs = Math.round((delayMs * (attempt + 1)) / 1000);
+      warm.innerHTML = `<div class="av">⏳</div><div class="bub" style="font-size:.82rem;color:var(--mu)">
+        🐝 LibBee is waking up the AI service… please wait (attempt ${attempt+1}/${retries})<br>
+        <span style="font-size:.74rem;opacity:.7">HF Space cold start can take up to 60 seconds on first use.</span>
+      </div>`;
       await new Promise(res => setTimeout(res, delayMs));
     }
   }
@@ -1326,6 +1338,7 @@ async function answerFromLLM(msg) {
   try {
     let reply = '';
     if (activeModel === 'claude') {
+      // Claude: use web search for up-to-date answers
       try {
         const ws = await callClaudeWebSearch(chatHist, GEN_SYS);
         reply = fmt(ws.text);
@@ -1339,7 +1352,32 @@ async function answerFromLLM(msg) {
         reply = fmt(await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:500})) + ' ' + badge();
       }
     } else {
-      reply = fmt(await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:500})) + ' ' + badge();
+      // GPT: use HF Space /general (OpenAI Responses API with web search)
+      try {
+        const r = await fetchWithRetry(RAG_URL + '/general', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question: msg, history: chatHist.slice(-6), model: 'gpt'})
+        });
+        if (r && r.ok) {
+          const d = await r.json();
+          if (d.answer) {
+            reply = fmt(d.answer) + ' ' + badge();
+            // Show web sources if returned
+            if (d.sources && d.sources.length > 0) {
+              reply += '<div style="margin-top:8px;font-size:.74rem;color:var(--mu)"><strong>Web sources:</strong> ';
+              reply += d.sources.slice(0,4).map(s=>`<a href="${s.url}" target="_blank" style="color:var(--t)">${s.title||s.url}</a>`).join(' · ');
+              reply += '</div>';
+            }
+            if (d.model === 'gpt-4o-mini-web') {
+              reply += ' <span class="model-badge" style="background:#E6F1FB;color:#0C447C">Web</span>';
+            }
+          } else { throw new Error('no answer'); }
+        } else { throw new Error('HF general failed'); }
+      } catch(e) {
+        // Fallback to Cloudflare Worker if HF also fails
+        reply = fmt(await callLLM({system:GEN_SYS, messages:chatHist, max_tokens:500})) + ' ' + badge();
+      }
     }
     reply += addFindResourcesBtn(msg);
     document.getElementById(tid4)?.remove();
