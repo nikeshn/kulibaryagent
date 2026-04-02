@@ -540,7 +540,7 @@ async function callAgent(question) {
   html += ` ${badge()} <span class="model-badge" style="background:#f0fdf4;color:#14532d">${intentLabel}</span>`;
 
   // Return both html and the corrected query so recovery banner shows clean text
-  return { html, correctedQuery: data.corrected_query || question, intent: data.intent || 'general' };
+  return { html, correctedQuery: data.corrected_query || question, intent: data.intent, toolsUsed: data.tools_used||[], sourceMode: (data.intent==='general_recent'?'general_web':data.intent==='library_info'?'library_kb':(data.intent||'agent')), responseTime: data.response_time||0, answerText: stripHtml(data.answer||html), isFollowUp: !!data.is_follow_up };
 }
 
 // =================================================================
@@ -1013,19 +1013,76 @@ let LIB_SYS = `You are the Khalifa University Library Assistant. Answer question
 
 function trimChatHist() { if(chatHist.length>20) chatHist=chatHist.slice(-20); }
 
-function logToAdmin(msg, intent, results) {
+
+function logToAdmin(msg, intent, results, meta={}) {
   try {
-    // Field names must match worker.js D1 INSERT: question, tool, result_count, model
     fetch(W+'/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       question: (msg||'').substring(0,200),
-      tool: intent||'unknown',
+      tool: meta.tool || intent || 'unknown',
       result_count: results||0,
-      model: activeModel,
-      response_time: 0,
+      model: meta.model || activeModel,
+      response_time: meta.response_time || 0,
+      intent: meta.intent || null,
+      is_follow_up: meta.is_follow_up || false,
+      source_mode: meta.source_mode || null,
+      error: meta.error || null,
       timestamp: new Date().toISOString()
     })}).catch(()=>{});
   } catch(e) {}
 }
+
+const feedbackStore = {};
+function stripHtml(html){ const d=document.createElement('div'); d.innerHTML=html||''; return (d.textContent||d.innerText||'').trim(); }
+function attachFeedbackToLatestBot(meta={}) {
+  const bots=[...document.querySelectorAll('#chatMsgs .msg.bot')];
+  const last=bots[bots.length-1];
+  if(!last) return;
+  if(last.querySelector('.feedback-mini')) return;
+  const id='fb'+Date.now()+Math.random().toString(36).slice(2,6);
+  feedbackStore[id]=meta;
+  const box=document.createElement('div');
+  box.className='feedback-mini';
+  box.style.cssText='margin-top:10px;font-size:.74rem;color:var(--mu);display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+  box.innerHTML=`<span>Was this helpful?</span><button data-fb-id="${id}" data-fb="up" style="padding:3px 8px;border:1px solid var(--br);border-radius:999px;background:#fff;cursor:pointer">👍</button><button data-fb-id="${id}" data-fb="down" style="padding:3px 8px;border:1px solid var(--br);border-radius:999px;background:#fff;cursor:pointer">👎</button><span class="fb-msg" style="display:none;color:var(--ku-blue)"></span>`;
+  last.querySelector('.bub')?.appendChild(box);
+}
+async function submitFeedback(id, feedback){
+  const meta=feedbackStore[id]||{};
+  try{
+    await fetch(W+'/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      question: (meta.question||'').substring(0,300),
+      answer_excerpt: (meta.answer_excerpt||'').substring(0,500),
+      feedback,
+      tool: meta.tool||null,
+      model: meta.model||activeModel,
+      intent: meta.intent||null,
+      source_mode: meta.source_mode||null
+    })});
+  }catch(e){}
+  const btn=document.querySelector(`[data-fb-id="${id}"]`);
+  const box=btn?.closest('.feedback-mini');
+  const msg=box?.querySelector('.fb-msg');
+  if(msg){ msg.style.display='inline'; msg.textContent = feedback==='up' ? 'Thanks!' : 'Thanks — we'll use this to improve LibBee.'; }
+  box?.querySelectorAll('button').forEach(b=>b.disabled=true);
+}
+
+document.addEventListener('click', (e)=>{
+  const fb=e.target.closest('[data-fb-id][data-fb]');
+  if(fb){ submitFeedback(fb.dataset.fbId, fb.dataset.fb); return; }
+  const a=e.target.closest('a[href]');
+  if(!a) return;
+  const inAdmin=location.pathname.startsWith('/admin');
+  if(inAdmin) return;
+  const kind = a.closest('.ai-tool-btn') ? 'ai_tool' : a.closest('.rcard') ? 'result_link' : 'link';
+  fetch(W+'/click',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    kind,
+    label: (a.textContent||'').trim().substring(0,200),
+    url: a.href,
+    tool: kind,
+    intent: null
+  })}).catch(()=>{});
+});
+
 
 window.addEventListener('DOMContentLoaded', async () => {
   await loadConfig();
@@ -1110,12 +1167,12 @@ async function sendChat(){
 
   // 1. FAQ match (instant, free)
   const faq = FAQ_KB.find(f => f.q.test(msg));
-  if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
+  if (faq) { await addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); logToAdmin(msg,'faq',1,{intent:'library_info',source_mode:'library_kb'}); attachFeedbackToLatestBot({question: msg, answer_excerpt: faq.a, tool:'faq', intent:'library_info', source_mode:'library_kb'}); showFollowUps('library'); return; }
 
   // 2. Database mention
   if(isDBQuery(msg)){
     addMsg('bot',`For all Khalifa University Library databases: <a href="${ERESOURCES}" target="_blank"><strong>library.ku.ac.ae/eresources</strong></a> ${badge()}`);
-    chatHist.push({role:'assistant',content:'See eresources'}); logToAdmin(msg,'database',1); showFollowUps('library'); return;
+    chatHist.push({role:'assistant',content:'See eresources'}); logToAdmin(msg,'database',1,{intent:'library_info',source_mode:'library_kb'}); attachFeedbackToLatestBot({question: msg, answer_excerpt: 'See eresources', tool:'database', intent:'library_info', source_mode:'library_kb'}); showFollowUps('library'); return;
   }
 
   // 3. Subject mapping
@@ -1126,7 +1183,7 @@ async function sendChat(){
       return db ? `<a href="${db.url}" target="_blank" style="color:var(--t)">${d}</a>` : d;
     }).join(' · ');
     addMsg('bot',`For <strong>${subj.subject}</strong>, I recommend these databases: ${dbLinks}<br><br>Browse all at <a href="${ERESOURCES}" target="_blank">library.ku.ac.ae/eresources</a> ${badge()}`);
-    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); logToAdmin(msg,'subject_map',subj.databases.length); showFollowUps('search'); return;
+    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); logToAdmin(msg,'subject_map',subj.databases.length,{intent:'search_academic',source_mode:'database_search'}); attachFeedbackToLatestBot({question: msg, answer_excerpt: `Recommended databases for ${subj.subject}`, tool:'subject_map', intent:'search_academic', source_mode:'database_search'}); showFollowUps('search'); return;
   }
 
   // 4. Generic "find articles/books"
@@ -1174,7 +1231,10 @@ async function sendChat(){
       }
       document.getElementById(tid2)?.remove();
       chatHist.push({role:'assistant', content:reply});
-      addBotStreamed(reply); logToAdmin(msg,'agent',1); showFollowUps('general', correctedQuery);
+      await addBotStreamed(reply);
+      logToAdmin(msg,'agent',1,{intent: (typeof agentResult!=='undefined'&&agentResult.intent)||'general', source_mode:(typeof agentResult!=='undefined'&&agentResult.sourceMode)||'agent'});
+      attachFeedbackToLatestBot({question: msg, answer_excerpt: stripHtml(reply), tool:'agent', intent:(typeof agentResult!=='undefined'&&agentResult.intent)||'general', source_mode:(typeof agentResult!=='undefined'&&agentResult.sourceMode)||'agent'});
+      showFollowUps('general', correctedQuery);
     } catch(e) { document.getElementById(tid2)?.remove(); addMsg('bot','⚠️ '+e.message); }
     return;
   }
@@ -1195,25 +1255,6 @@ async function sendChat(){
       return;
     }
 
-    // ── STEP 2: Main agent path — keeps follow-ups on the same source when possible ──
-    try {
-      const agentResult = await callAgent(msg);
-      clearInterval(statusTimer); document.getElementById(tid)?.remove();
-      const replyHtml = agentResult.html + addFindResourcesBtn(agentResult.correctedQuery || msg);
-      chatHist.push({role:'assistant', content:replyHtml});
-      addBotStreamed(replyHtml);
-      logToAdmin(msg,'agent',1);
-      showFollowUps((agentResult.intent||'general').startsWith('search') ? 'search' : ((agentResult.intent||'')==='library_info' ? 'library' : 'general'), agentResult.correctedQuery || msg);
-      return;
-    } catch(agentErr) {
-      if (agentErr.redirectToSearch) {
-        clearInterval(statusTimer); document.getElementById(tid)?.remove();
-        await fullSearch(agentErr.correctedQuery || msg, chatHist, cm);
-        return;
-      }
-      console.warn('Agent failed, falling back to legacy RAG path:', agentErr.message);
-    }
-
     // ── STEP 2: RAG first — always try library knowledge base ──
     let answered = false;
     try {
@@ -1223,8 +1264,9 @@ async function sendChat(){
       // Append "find articles" button to RAG answer
       const ragHtml = ragAnswer + addFindResourcesBtn(msg) + ' ' + badge() + ' <span class="model-badge" style="background:#E1F5EE;color:#0F6E56">Library KB</span>';
       chatHist.push({role:'assistant', content:ragAnswer});
-      addBotStreamed(ragHtml);
-      logToAdmin(msg,'rag',1);
+      await addBotStreamed(ragHtml);
+      logToAdmin(msg,'rag',1,{intent:'library_info', source_mode:'library_kb'});
+      attachFeedbackToLatestBot({question: msg, answer_excerpt: stripHtml(ragAnswer), tool:'rag', intent:'library_info', source_mode:'library_kb'});
       answered = true;
     } catch(ragErr) {
       console.warn('RAG unavailable or no answer:', ragErr.message);
