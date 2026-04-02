@@ -540,7 +540,7 @@ async function callAgent(question) {
   html += ` ${badge()} <span class="model-badge" style="background:#f0fdf4;color:#14532d">${intentLabel}</span>`;
 
   // Return both html and the corrected query so recovery banner shows clean text
-  return { html, correctedQuery: data.corrected_query || question };
+  return { html, correctedQuery: data.corrected_query || question, intent: data.intent || 'general' };
 }
 
 // =================================================================
@@ -1193,6 +1193,25 @@ async function sendChat(){
       clearInterval(statusTimer); document.getElementById(tid)?.remove();
       await fullSearch(msg, chatHist, cm);
       return;
+    }
+
+    // ── STEP 2: Main agent path — keeps follow-ups on the same source when possible ──
+    try {
+      const agentResult = await callAgent(msg);
+      clearInterval(statusTimer); document.getElementById(tid)?.remove();
+      const replyHtml = agentResult.html + addFindResourcesBtn(agentResult.correctedQuery || msg);
+      chatHist.push({role:'assistant', content:replyHtml});
+      addBotStreamed(replyHtml);
+      logToAdmin(msg,'agent',1);
+      showFollowUps((agentResult.intent||'general').startsWith('search') ? 'search' : ((agentResult.intent||'')==='library_info' ? 'library' : 'general'), agentResult.correctedQuery || msg);
+      return;
+    } catch(agentErr) {
+      if (agentErr.redirectToSearch) {
+        clearInterval(statusTimer); document.getElementById(tid)?.remove();
+        await fullSearch(agentErr.correctedQuery || msg, chatHist, cm);
+        return;
+      }
+      console.warn('Agent failed, falling back to legacy RAG path:', agentErr.message);
     }
 
     // ── STEP 2: RAG first — always try library knowledge base ──
