@@ -1120,11 +1120,20 @@ async function sendChat(){
     return;
   }
 
-  // 0b. Pure greeting shortcut — deterministic LibBee intro
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening)[!?.\s]*$/i.test(msg)) {
-    const intro = `Hi! I’m <strong>LibBee</strong>, the Khalifa University Library AI Assistant.<br><br>I can help you find articles and books, search databases, access full text, request Interlibrary Loan (ILL), and answer questions about library services and staff.<br><br>Are you looking for one of these? You can also type your question directly. ${badge()}`;
-    addBotStreamed(intro);
-    chatHist.push({role:'assistant',content:'Hi! I’m LibBee, the Khalifa University Library AI Assistant.'});
+  // 0b. Follow-up to the LibBee greeting menu
+  if (isGreetingMenuFollowup(msg, lastBotMsg)) {
+    const reply = renderGreetingClarify() + ' ' + badge();
+    addMsg('bot', reply);
+    chatHist.push({role:'assistant',content:'GREETING_MENU_FOLLOWUP'});
+    logToAdmin(msg,'social_greeting_followup',0);
+    return;
+  }
+
+  // 0c. Pure greeting shortcut
+  if (isPureGreeting(msg)) {
+    const reply = `Hi! I’m <strong>LibBee</strong>, the Khalifa University Library AI Assistant.<br><br>I can help you find articles and books, search databases, access full text, request Interlibrary Loan (ILL), and answer questions about library services and staff.<br><br>Are you looking for one of these? You can also type your question directly. ${badge()}`;
+    addMsg('bot', reply);
+    chatHist.push({role:'assistant',content:'Hi! I’m <strong>LibBee</strong>, the Khalifa University Library AI Assistant. Are you looking for one of these?'});
     logToAdmin(msg,'social_greeting',0);
     return;
   }
@@ -1344,6 +1353,19 @@ function maybeEnhanceGreeting(html){
     return html + renderGreetingQuickActions();
   }
   return html;
+}
+
+function isPureGreeting(msg){
+  return /^(hi|hello|hey|good morning|good afternoon|good evening)[!.\s]*$/i.test(String(msg||'').trim());
+}
+
+function isGreetingMenuFollowup(msg,lastBotMsg){
+  return /^(yes|yes please|yes check|sure|okay|ok|yeah|yep|please do|go ahead)$/i.test(String(msg||'').trim())
+    && /i[’']?m <strong>libbee<\/strong>|are you looking for one of these|khalifa university library ai assistant/i.test(String(lastBotMsg||''));
+}
+
+function renderGreetingClarify(){
+  return `Sure — what would you like help with?<br><br>You can choose one of these or type your question directly.` + renderGreetingQuickActions();
 }
 
 function addMsg(role,html){
