@@ -543,6 +543,15 @@ async function callAgent(question) {
   html += ` ${badge()} <span class="model-badge" style="background:#f0fdf4;color:#14532d">${intentLabel}</span>`;
 
   // Return both html and the corrected query so recovery banner shows clean text
+  if (data.intent === 'social_greeting') {
+    html += `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+      <button onclick="askForSubject()" style="padding:6px 12px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.74rem;font-weight:600;cursor:pointer">📚 Find articles</button>
+      <button onclick="chip('How do I get full text for an article?')" style="padding:6px 12px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.74rem;font-weight:600;cursor:pointer">📄 Get full text</button>
+      <button onclick="chip('How do I request Interlibrary Loan?')" style="padding:6px 12px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.74rem;font-weight:600;cursor:pointer">📬 Interlibrary Loan</button>
+      <button onclick="chip('Who can I contact at the library?')" style="padding:6px 12px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.74rem;font-weight:600;cursor:pointer">💬 Contact a librarian</button>
+      <button onclick="chip('What are the library hours?')" style="padding:6px 12px;background:#f0f4ff;color:var(--ku-blue);border:1.5px solid var(--ku-blue);border-radius:20px;font-size:.74rem;font-weight:600;cursor:pointer">⏰ Library hours</button>
+    </div>`;
+  }
   return { html, correctedQuery: data.corrected_query || question };
 }
 
