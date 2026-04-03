@@ -1132,7 +1132,7 @@ async function sendChat(){
     const reply = renderGreetingClarify() + ' ' + badge();
     addMsg('bot', reply);
     chatHist.push({role:'assistant',content:'GREETING_MENU_FOLLOWUP'});
-    logToAdmin(msg,'social_greeting_followup',0);
+    window.lastIntent='social_greeting_followup'; logToAdmin(msg,'social_greeting_followup',0);
     return;
   }
 
@@ -1141,18 +1141,18 @@ async function sendChat(){
     const reply = `Hi! I’m <strong>LibBee</strong>, the Khalifa University Library AI Assistant.<br><br>I can help you find articles and books, search databases, access full text, request Interlibrary Loan (ILL), and answer questions about library services and staff.<br><br>Are you looking for one of these? You can also type your question directly. ${badge()}`;
     addMsg('bot', reply);
     chatHist.push({role:'assistant',content:'Hi! I’m <strong>LibBee</strong>, the Khalifa University Library AI Assistant. Are you looking for one of these?'});
-    logToAdmin(msg,'social_greeting',0);
+    window.lastIntent='social_greeting'; logToAdmin(msg,'social_greeting',0);
     return;
   }
 
   // 1. FAQ match (instant, free)
   const faq = FAQ_KB.find(f => f.q.test(msg));
-  if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
+  if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); window.lastIntent='faq'; logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
 
   // 2. Database mention
   if(isDBQuery(msg)){
     addMsg('bot',`For all Khalifa University Library databases: <a href="${ERESOURCES}" target="_blank"><strong>library.ku.ac.ae/eresources</strong></a> ${badge()}`);
-    chatHist.push({role:'assistant',content:'See eresources'}); logToAdmin(msg,'database',1); showFollowUps('library'); return;
+    chatHist.push({role:'assistant',content:'See eresources'}); window.lastIntent='database'; logToAdmin(msg,'database',1); showFollowUps('library'); return;
   }
 
   // 3. Subject mapping
@@ -1163,7 +1163,7 @@ async function sendChat(){
       return db ? `<a href="${db.url}" target="_blank" style="color:var(--t)">${d}</a>` : d;
     }).join(' · ');
     addMsg('bot',`For <strong>${subj.subject}</strong>, I recommend these databases: ${dbLinks}<br><br>Browse all at <a href="${ERESOURCES}" target="_blank">library.ku.ac.ae/eresources</a> ${badge()}`);
-    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); logToAdmin(msg,'subject_map',subj.databases.length); showFollowUps('search'); return;
+    chatHist.push({role:'assistant',content:`Recommended databases for ${subj.subject}`}); window.lastIntent='subject_map'; logToAdmin(msg,'subject_map',subj.databases.length); showFollowUps('search'); return;
   }
 
   // 4. Generic "find articles/books"
@@ -1211,7 +1211,7 @@ async function sendChat(){
       }
       document.getElementById(tid2)?.remove();
       chatHist.push({role:'assistant', content:reply});
-      addBotStreamed(reply); logToAdmin(msg,'agent',1); showFollowUps('general', correctedQuery);
+      addBotStreamed(reply); window.lastIntent='agent'; logToAdmin(msg,'agent',1); showFollowUps('general', correctedQuery);
     } catch(e) { document.getElementById(tid2)?.remove(); addMsg('bot','⚠️ '+e.message); }
     return;
   }
@@ -1242,7 +1242,7 @@ async function sendChat(){
       const ragHtml = ragAnswer + addFindResourcesBtn(msg) + ' ' + badge() + ' <span class="model-badge" style="background:#E1F5EE;color:#0F6E56">Library KB</span>';
       chatHist.push({role:'assistant', content:ragAnswer});
       addBotStreamed(ragHtml);
-      logToAdmin(msg,'rag',1);
+      window.lastIntent='rag'; logToAdmin(msg,'rag',1);
       answered = true;
     } catch(ragErr) {
       console.warn('RAG unavailable or no answer:', ragErr.message);
@@ -1276,7 +1276,7 @@ async function sendChat(){
       });
     }, 100);
     chatHist.push({role:'assistant', content:'Not in library KB. Asked user: use general AI or find articles?'});
-    logToAdmin(msg,'not_in_kb',0);
+    window.lastIntent='not_in_kb'; logToAdmin(msg,'not_in_kb',0);
 
   }catch(e){
     clearInterval(statusTimer); document.getElementById(tid)?.remove(); document.getElementById(tid3)?.remove();
@@ -1388,6 +1388,33 @@ async function streamText(el, html, delayMs=8) {
 }
 
 // Clear chat history and reset UI
+
+function shouldShowFeedback(html){
+  const t=String(html||'').toLowerCase();
+  if(!t || t.length<30) return false;
+  if(t.includes('are you looking for one of these') || t.includes('what would you like help with')) return false;
+  return true;
+}
+async function sendFeedbackVote(btn, vote, question, answerHtml, intent=''){
+  try{
+    await fetch(RAG_URL + '/feedback', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question: question||'', feedback: vote, answer_excerpt: String(answerHtml||'').replace(/<[^>]+>/g,' ').slice(0,400), intent: intent||''})});
+    const box=btn.closest('.feedback-box');
+    if(box){ box.innerHTML = vote==='up' ? 'Thanks for your feedback 👍' : 'Thanks for your feedback 👎'; box.style.fontSize='.74rem'; box.style.color='var(--mu)'; }
+  }catch(e){}
+}
+function appendFeedbackBox(msgEl, question, answerHtml, intent=''){
+  if(!msgEl || !shouldShowFeedback(answerHtml)) return;
+  if(msgEl.querySelector('.feedback-box')) return;
+  const box=document.createElement('div');
+  box.className='feedback-box';
+  box.style.cssText='margin-top:8px;font-size:.74rem;color:var(--mu);display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+  box.innerHTML=`<span>Was this helpful?</span>
+    <button style="padding:3px 8px;border:1px solid var(--br);border-radius:14px;background:#fff;cursor:pointer" data-v="up">👍</button>
+    <button style="padding:3px 8px;border:1px solid var(--br);border-radius:14px;background:#fff;cursor:pointer" data-v="down">👎</button>`;
+  box.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>sendFeedbackVote(btn, btn.dataset.v, question, answerHtml, intent)));
+  msgEl.querySelector('.bub')?.appendChild(box);
+}
+
 function clearChat() {
   const cm = document.getElementById('chatMsgs');
   chatHist = [];
@@ -1406,6 +1433,7 @@ async function addBotStreamed(html) {
   el.innerHTML='<div class="av" style="background:transparent"><img src="data:image/png;base64,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" alt="LibBee" style="width:28px;height:28px;object-fit:contain;border-radius:50%"></div>';el.appendChild(bubEl);
   cm.appendChild(el);cm.scrollTop=9999;
   await streamText(bubEl, html, 10);
+  appendFeedbackBox(el, window.lastAskedMsg||'', html, window.lastIntent||'');
   cm.scrollTop=9999;
 }
 function fmt(t){return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank">$1</a>').replace(/\n/g,'<br>');}
@@ -1470,7 +1498,7 @@ async function answerFromLLM(msg) {
     document.getElementById(tid4)?.remove();
     chatHist.push({role:'assistant', content:reply});
     addBotStreamed(reply);
-    logToAdmin(msg, 'llm_general_confirmed', 1);
+    window.lastIntent='llm_general_confirmed'; logToAdmin(msg, 'llm_general_confirmed', 1);
   } catch(e) {
     document.getElementById(tid4)?.remove();
     addMsg('bot', '⚠️ ' + e.message);
