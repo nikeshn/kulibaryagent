@@ -546,7 +546,24 @@ async function callAgent(question) {
     naturalQuery:    data.natural_query || question,
     databaseQuery:   data.database_query || question,
     redirectToSearch: false,
+    // ask_librarian: null=auto-decide, true=always show, false=never show
+    askLibrarian:    data.ask_librarian,
   };
+}
+
+// =================================================================
+// ASK A LIBRARIAN FOOTER RENDERER
+// Called by sendChat when the backend signals ask_librarian=true,
+// or auto-shown for certain intents. Returns an HTML string.
+// =================================================================
+function renderAskLibrarian() {
+  return '<div style="margin-top:12px;padding:10px 14px;background:#f0f4ff;border-radius:10px;border:1px solid #c4b5fd;font-size:.80rem;color:#3730a3">' +
+    '💬 <strong>Need more specific help?</strong> ' +
+    '<a href="https://library.ku.ac.ae/AskUs" target="_blank" style="color:#003366;font-weight:700">Ask a Librarian</a> ' +
+    '— the KU Library team is available during library hours. ' +
+    'Or browse the full library website: ' +
+    '<a href="https://library.ku.ac.ae/lib" target="_blank" style="color:#003366">library.ku.ac.ae</a>' +
+    '</div>';
 }
 
 
@@ -1378,6 +1395,23 @@ async function sendChat(){
       // Model + intent badge
       html += ' ' + badge();
       if (intentLabel) html += ' <span class="model-badge" style="background:#f0fdf4;color:#14532d">' + intentLabel + '</span>';
+
+      // ── Ask a Librarian footer ──
+      // Rules (mirrors backend logic):
+      //   askLibrarian === false  → never show (hardcoded answers, RAG answers)
+      //   askLibrarian === true   → always show (Tier1/2/3 fallback answers)
+      //   askLibrarian === null/undefined → auto: show if KU web search was used
+      const showAskLib = (function() {
+        if (agentResult.askLibrarian === false) return false;
+        if (agentResult.askLibrarian === true)  return true;
+        // Auto-mode: show for library_info when fallback tools were used
+        if (agentResult.intent === 'library_info') {
+          const fallbackTools = ['ku_web_search','ku_only_llm','redirected','general_fallback'];
+          return (agentResult.toolsUsed || []).some(t => fallbackTools.includes(t));
+        }
+        return false;
+      })();
+      if (showAskLib) html += renderAskLibrarian();
 
       // For social_greeting intent, always append the quick-action buttons
       if (agentResult.intent === 'social_greeting') {
