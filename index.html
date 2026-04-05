@@ -747,9 +747,15 @@ function buildAIToolsPanel(naturalQuery, primoKeyword) {
 async function buildBoolean(query, history){
   const currentYear = serverYear;
 
-  // Pre-clean: strip common chat prefixes
+  // Pre-clean: strip chat prefixes, connectors, and follow-up fragments
+  // so the backend receives a clean topic, not "and for physics" or "also about X"
   const cleanedQuery = query
-    .replace(/^(find articles and books on|find articles on|find books on|search for|look for|i want|i need|give me|show me)\s+/i, '')
+    // Strip common search prefixes
+    .replace(/^(find articles and books on|find articles on|find books on|search for|look for|i want|i need|give me|show me|get me|fetch|retrieve)\s+/i, '')
+    // Strip leading connectors/follow-up fragments that make queries meaningless
+    .replace(/^(and\s+(also\s+)?(for|about|on|in|related to|regarding)|also\s+(for|about|on|in)|what about|how about|or\s+about|tell me about|what is|what are|more\s+(about|on))\s+/i, '')
+    // Strip trailing noise
+    .replace(/\s+(please|thanks|thank you|asap|quickly|now)$/i, '')
     .trim();
 
   // === PROGRAMMATIC BOOLEAN BUILDER — always available, no LLM needed ===
@@ -810,14 +816,27 @@ async function buildBoolean(query, history){
   // === FALLBACK: Cloudflare Worker LLM ===
   try {
     const ctx = history.slice(-4).map(m=>`${m.role}: ${m.content}`).join('\n');
-    const prompt = `Fix ALL spelling mistakes in this query, then build a PRIMO Boolean.
-BOOLEAN: (mainTerm OR synonym) AND (mainTerm2 OR synonym2) — use AND/OR/parentheses.
-Examples:
-"impuct glubal waming" → boolean: ("global warming" OR "climate change") AND (impact OR effect)
-"machne lerning helthcare" → boolean: ("machine learning" OR AI) AND (healthcare OR clinical)
+    const prompt = `You are a search assistant for Khalifa University Library.
+The user typed a query (possibly messy, fragmented, or with chat phrasing).
+
+Do THREE things:
+1. corrected: fix spelling, keep the core topic
+2. natural: write a MEANINGFUL research phrase for AI tools (Consensus, Perplexity, Semantic Scholar).
+   Must be a proper research phrase — NOT raw keywords, NOT Boolean operators.
+   If input is fragmented ("and for physics", "also about AI") extract the core topic and expand it.
+   Examples: "physics" → "recent advances in physics research"
+             "and for chemistry" → "chemistry research and applications"
+             "AI" → "artificial intelligence in research and technology"
+3. boolean: PRIMO/PubMed Boolean query with AND/OR/parentheses
+
+Input examples:
+"and for physics" → corrected:"physics", natural:"recent advances in physics research", boolean:("physics" OR "physical sciences")
+"impuct glubal waming" → corrected:"impact global warming", natural:"impact of global warming on climate", boolean:("global warming" OR "climate change") AND (impact OR effect)
+"machne lerning helthcare" → corrected:"machine learning healthcare", natural:"machine learning applications in healthcare", boolean:("machine learning" OR AI) AND (healthcare OR clinical)
+
 Query: "${cleanedQuery}"
 Context: ${ctx}
-Return ONLY JSON: {"corrected":"fixed","boolean":"(A OR B) AND (C OR D)","natural":"title","year_from":"","year_to":"","peer_reviewed":false,"open_access":false}`;
+Return ONLY valid JSON: {"corrected":"...","natural":"...","boolean":"...","year_from":"","year_to":"","peer_reviewed":false,"open_access":false}`;
 
     const txt = await callLLM({messages:[{role:'user', content:prompt}], max_tokens:300});
     const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
@@ -920,11 +939,12 @@ async function fullSearch(msg, chatHist, cm) {
 
   // PubMed is treated like PRIMO here: use the processed database query rather than raw natural language.
   const pubmedBtn = res.isMedical ? `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer;width:100%">🏥 Also search PubMed (medical literature)</button></div>` : '';
-  // AI tools panel — natural language query for all tools, PRIMO keyword for PRIMO AI
+  // AI tools: use res.natural (LLM-cleaned meaningful phrase, e.g. "physics research")
+  //           NOT res.corrected (which is just spell-fixed raw input, e.g. "and for physics")
+  // PRIMO AI:  use primoKeyword (bare keywords stripped of Boolean operators)
   const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
-  // AI tools get corrected natural language; PRIMO AI gets keywords only
-  const correctedQuery = res.corrected || msg;
-  area.innerHTML += buildAIToolsPanel(correctedQuery, primoKeyword) + pubmedBtn;
+  const aiQuery = res.natural || res.corrected || msg;
+  area.innerHTML += buildAIToolsPanel(aiQuery, primoKeyword) + pubmedBtn;
 
   chatHist.push({role:'assistant', content:`Search: ${res.natural||res.explanation}. Boolean: ${res.bool}`});
   logToAdmin(msg, 'search');
@@ -1524,8 +1544,10 @@ async function doSearch(){
     html += `<div style="font-size:.78rem;color:var(--mu);margin-top:8px">${res.error ? 'PRIMO API: '+res.error : 'No results found.'}</div>`;
   }
 
-  // AI tools get corrected natural language; PRIMO AI gets primoKeyword; PubMed gets full Boolean
-  html += buildAIToolsPanel(correctedQuery, primoKeyword);
+  // AI tools: use natural (LLM-cleaned meaningful phrase) not corrected (raw spell-fixed input)
+  // This ensures AI tools get a proper research phrase, not a chat fragment
+  const aiQuery = res.natural || correctedQuery;
+  html += buildAIToolsPanel(aiQuery, primoKeyword);
   if (res.isMedical) {
     // PubMed supports full Boolean syntax — pass res.bool directly
     html += `<div style="margin-top:8px"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(res.db || res.bool)}" target="_blank" style="display:block;padding:8px 14px;background:#d1fae5;color:#065f46;border-radius:8px;text-decoration:none;font-weight:700;font-size:.8rem;text-align:center">🏥 Also search PubMed (medical literature) →</a></div>`;
