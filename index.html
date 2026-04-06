@@ -632,7 +632,7 @@ function renderResultCard(r, idx, sid) {
   const pubmedLink = r.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/` : null;
   const fallbackLink = primoLink || safeLink(r.link) || (r.doi ? `https://doi.org/${r.doi}` : pubmedLink);
   const titleLink = fallbackLink ? `<a href="${fallbackLink}" target="_blank">${r.title}</a>` : r.title;
-  const srcBadge = r._source ? `<span class="rcard-tag" style="background:${{'PRIMO':'#fef3c7','PubMed':'#d1fae5','Google Scholar':'#e0e7ff'}[r._source]||'var(--bg)'};color:${{'PRIMO':'#92400e','PubMed':'#065f46','Google Scholar':'#3730a3'}[r._source]||'var(--mu)'}">${r._source}</span>` : '';
+  const srcBadge = r._source ? `<span class="rcard-tag" style="background:${{'PRIMO':'#fef3c7','PubMed':'#d1fae5','Google Scholar':'#e0e7ff','EBSCO EDS':'#fce7f3'}[r._source]||'var(--bg)'};color:${{'PRIMO':'#92400e','PubMed':'#065f46','Google Scholar':'#3730a3','EBSCO EDS':'#9d174d'}[r._source]||'var(--mu)'}">${r._source}</span>` : '';
   const citeBadge = r.citations ? `<span class="rcard-tag" style="background:#fef3c7;color:#92400e">Cited: ${r.citations}</span>` : '';
   const cid = sid ? `${sid}_${idx}` : `global_${idx}`;
   return `<div class="rcard" id="rc${cid}">
@@ -939,12 +939,14 @@ async function fullSearch(msg, chatHist, cm) {
 
   // PubMed is treated like PRIMO here: use the processed database query rather than raw natural language.
   const pubmedBtn = res.isMedical ? `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer;width:100%">🏥 Also search PubMed (medical literature)</button></div>` : '';
+  // EBSCO EDS button — always shown
+  const edsBtn = `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','eds')" style="padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #f9a8d4;cursor:pointer;width:100%">📰 Also search EBSCO Databases (EDS)</button></div>`;
   // AI tools: use res.natural (LLM-cleaned meaningful phrase, e.g. "physics research")
   //           NOT res.corrected (which is just spell-fixed raw input, e.g. "and for physics")
   // PRIMO AI:  use primoKeyword (bare keywords stripped of Boolean operators)
   const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
   const aiQuery = res.natural || res.corrected || msg;
-  area.innerHTML += buildAIToolsPanel(aiQuery, primoKeyword) + pubmedBtn;
+  area.innerHTML += buildAIToolsPanel(aiQuery, primoKeyword) + pubmedBtn + edsBtn;
 
   chatHist.push({role:'assistant', content:`Search: ${res.natural||res.explanation}. Boolean: ${res.bool}`});
   logToAdmin(msg, 'search');
@@ -961,7 +963,7 @@ function doSearchNew(sid, source) {
   const cm = document.getElementById('chatMsgs');
 
   const loadEl = document.createElement('div');loadEl.className='msg bot';loadEl.style.maxWidth='96%';
-  const lbl = {primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Semantic Scholar'}[source]||source;
+  const lbl = {primo:'📚 PRIMO',pubmed:'🏥 PubMed',scholar:'🎓 Semantic Scholar',eds:'📰 EBSCO Databases'}[source]||source;
   loadEl.innerHTML=`<div class="av">🔍</div><div class="scard"><div class="typing" style="padding:8px 0"><span></span><span></span><span></span></div><div style="font-size:.8rem;color:var(--mu)">Searching ${lbl}…</div><div id="primo-results-area"></div></div>`;
   cm.appendChild(loadEl);cm.scrollTop=cm.scrollHeight;
   doSearchSource(sid, source, loadEl);
@@ -1001,12 +1003,16 @@ async function doSearchSource(sid, source, loadEl) {
         html += `<div style="text-align:center;margin-top:10px;padding:10px;background:var(--bg);border-radius:10px;font-size:.82rem"><a href="${mkURL(sp.bool,'Everything','MyInst_and_CI',[])}" target="_blank" style="color:var(--ku-blue);font-weight:700">View all ${tot.toLocaleString()} results in PRIMO →</a></div>`;
       }
       if (source === 'pubmed') {
-        // PubMed is treated like PRIMO here: use the processed database query
         const pubmedQ = sp.db || sp.q;
         html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#d1fae5;border-radius:10px;font-size:.82rem"><a href="https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(pubmedQ)}" target="_blank" style="color:#065f46;font-weight:700">View all ${tot.toLocaleString()} results in PubMed →</a></div>`;
       }
       if (source === 'scholar') {
         html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#e0e7ff;border-radius:10px;font-size:.82rem"><a href="https://www.semanticscholar.org/search?q=${encodeURIComponent(sp.orig||sp.q)}" target="_blank" style="color:#3730a3;font-weight:700">View all results in Semantic Scholar →</a></div>`;
+      }
+      if (source === 'eds') {
+        const edsQ = encodeURIComponent(sp.db || sp.q);
+        const edsUrl = `https://search.ebscohost.com/login.aspx?authtype=ip,uid&profile=edsapi&defaultdb=edssci&direct=true&query=${edsQ}`;
+        html += `<div style="text-align:center;margin-top:8px;padding:10px;background:#fce7f3;border-radius:10px;font-size:.82rem"><a href="${edsUrl}" target="_blank" style="color:#9d174d;font-weight:700">View all ${tot.toLocaleString()} results in EBSCO →</a></div>`;
       }
 
       area.innerHTML = html;
