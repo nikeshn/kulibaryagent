@@ -69,8 +69,8 @@ header{background:var(--ku-blue);color:#fff;padding:10px 16px;display:flex;align
 .slink.ai{background:linear-gradient(135deg,var(--ku-gold),var(--ku-blue));color:#fff}
 /* AI TOOLS PANEL */
 .ai-panel{margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#f0f4ff,#faf5ff);border-radius:12px;border:1px solid #c4b5fd}
-.ai-panel-title{font-size:.75rem;font-weight:800;color:#5b21b6;margin-bottom:4px;display:flex;align-items:center;gap:5px}
-.ai-panel-note{font-size:.65rem;color:var(--mu);margin-bottom:7px}
+.ai-panel-title{font-size:.75rem;font-weight:800;color:#5b21b6;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.ai-row-label{font-size:.67rem;font-weight:700;color:var(--mu);margin-bottom:5px;padding:2px 0}
 .ai-tools-strip{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .ai-tool-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:20px;text-decoration:none;font-size:.72rem;font-weight:700;transition:all .2s;border:1.5px solid transparent;white-space:nowrap;flex-shrink:0}
 .ai-tool-chip:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.14);opacity:.9}
@@ -698,18 +698,18 @@ function buildSearchCard(bool,explanation,corrected,raw,yf,yt,pr,oa,ol){
 }
 
 // =================================================================
-// AI TOOLS PANEL — 8 tools, single compact chip strip
+// AI TOOLS PANEL — 2 rows: KU subscribed + Freemium
 // ALL tools use naturalQuery (LLM-corrected natural language phrase)
 // =================================================================
 function buildAIToolsPanel(naturalQuery, primoKeyword) {
   const nq = encodeURIComponent(naturalQuery);
   const pk = encodeURIComponent(primoKeyword);
-  // EBSCO AI Search via EZProxy — natural language query
   const ebscoAIUrl = `https://khalifa.idm.oclc.org/login?url=http://search.ebscohost.com/login.aspx?authtype=ip,uid&profile=eds&direct=true&bquery=${nq}`;
   return `<div class="ai-panel">
     <div class="ai-panel-title">🤖 AI Research Tools</div>
-    <div class="ai-panel-note">All tools use your corrected query — sign in with <strong>firstname.lastname@ku.ac.ae</strong> where required</div>
-    <div class="ai-tools-strip">
+
+    <div class="ai-row-label">🔐 KU Subscribed — Register or sign in with <strong>firstname.lastname@ku.ac.ae</strong></div>
+    <div class="ai-tools-strip" style="margin-bottom:10px">
       <a class="ai-tool-chip leapspace" href="https://www.sciencedirect.com/leapspace?query=${nq}" target="_blank">
         <span class="tc-icon">🔬</span>LeapSpace
       </a>
@@ -722,6 +722,10 @@ function buildAIToolsPanel(naturalQuery, primoKeyword) {
       <a class="ai-tool-chip primoai" href="${AI_URL}${pk}" target="_blank">
         <span class="tc-icon">⭐</span>PRIMO AI
       </a>
+    </div>
+
+    <div class="ai-row-label">🆓 Freemium — You may need to register and sign in</div>
+    <div class="ai-tools-strip">
       <a class="ai-tool-chip consensus" href="https://consensus.app/results/?q=${nq}" target="_blank">
         <span class="tc-icon">🧬</span>Consensus
       </a>
