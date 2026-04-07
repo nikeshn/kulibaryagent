@@ -276,9 +276,9 @@ const FAQ_KB = [
   {q:/^\s*abdulla\s*$/i, a:'Did you mean <strong>Dr. Abdulla Al Hefeiti</strong>?<br><br><strong>Dr. Abdulla Al Hefeiti</strong> is the <strong>Library Director / Assistant Provost, Libraries</strong>. He can help with strategic and institutional matters, library leadership, and partnerships. Email: abdulla.alhefeiti@ku.ac.ae | Phone: +971 2 312 3331'},
   {q:/^\s*hefeiti\s*$/i, a:'Did you mean <strong>Dr. Abdulla Al Hefeiti</strong>?<br><br><strong>Dr. Abdulla Al Hefeiti</strong> is the <strong>Library Director / Assistant Provost, Libraries</strong>. He can help with strategic and institutional matters, library leadership, and partnerships. Email: abdulla.alhefeiti@ku.ac.ae | Phone: +971 2 312 3331'},
   {q:/\b(system librarian|systems librarian|who is system librarian|who is systems librarian)\b/i, a:'The Systems Librarian is <strong>Walter Brian Hall</strong>. He can help with library systems, website, and technology-related issues.'},
-  {q:/\b(who handles orcid|who can help.*orcid|orcid help)\b/i, a:'For ORCID, Open Access, and research impact support, contact <strong>Nikesh Narayanan</strong>.'},
+  {q:/\b(who handles orcid|who can help.*orcid|contact.*orcid|orcid help|who handles open access|who can help.*open access|contact.*open access|apc help|open access help)\b/i, a:'For ORCID, Open Access, and research impact support, contact <strong>Nikesh Narayanan</strong>.'},
   {q:/\b(who handles database access|database access problem|e-?resources? issue|remote access problem)\b/i, a:'For database and e-resources access issues, contact <strong>Rani Anand</strong>.'},
-  {q:/\b(medical librarian|who can help.*pubmed|pubmed help)\b/i, a:'For medical databases, PubMed, Embase, CINAHL, and systematic reviews, contact <strong>Jason Fetty</strong>.'},
+  {q:/\b(medical librarian|who can help.*pubmed|contact.*pubmed|pubmed help)\b/i, a:'For medical databases, PubMed, Embase, CINAHL, and systematic reviews, contact <strong>Jason Fetty</strong>.'},
   {q:/\b(library hours|opening hours|closing hours|open today|closed today|open now|when.*open|when.*close|what time.*open|what time.*close|habshan.*open|san.*open|main campus.*open|ramadan hours|friday hours|saturday hours)\b/i, a:'For the most accurate opening and closing times, please check the official Library Hours page: <a href="https://library.ku.ac.ae/hours" target="_blank">library.ku.ac.ae/hours</a>. Hours may vary by campus and during exams, holidays, and Ramadan.'},
   {q:/\b(khalifa university|ku)\b.*\b(admission|admissions|program|programs|degree|degrees|college|colleges|school|schools|tuition|fees|scholarship|scholarships|ranking|rankings|president|vice president|chancellor|application|apply|registrar|academic calendar|semester dates|campus map)\b|\b(admission|admissions|program|programs|degree|degrees|college|colleges|school|schools|tuition|fees|scholarship|scholarships|ranking|rankings|president|vice president|chancellor|application|apply|registrar|academic calendar|semester dates|campus map)\b.*\b(khalifa university|ku)\b/i, a:'I’m <strong>LibBee</strong>, the Khalifa University <strong>Library</strong> AI Assistant, so I’m best for library resources, services, databases, research help, and staff contacts.<br><br>For general Khalifa University questions, please visit the main KU website: <a href="https://www.ku.ac.ae/" target="_blank">www.ku.ac.ae</a>. A broader university chatbot is available there for non-library questions.'},
   {q:/library hours|opening hours|what time|when.*open|when.*close/i, a:'For current library hours, please visit: <a href="https://library.ku.ac.ae/hours" target="_blank">library.ku.ac.ae/hours</a>. Hours may vary during exam periods and holidays.'},
@@ -286,8 +286,8 @@ const FAQ_KB = [
   {q:/interlibrary loan|ill |request.*book.*another/i, a:'Khalifa University offers Interlibrary Loan (ILL) for items not available in our collection. Submit your request at: <a href="https://library.ku.ac.ae/ill/" target="_blank">library.ku.ac.ae/ill</a>'},
   {q:/renew.*book|extend.*loan|loan period|how long.*borrow|borrowing/i, a:'You can renew your loans through your library account: <a href="https://khalifa.primo.exlibrisgroup.com/discovery/account?vid=971KUOSTAR_INST:KU" target="_blank">My Library Account</a>. Most items can be renewed up to 3 times if not requested by another user.'},
   {q:/fine|fee|overdue|penalty|late.*return/i, a:'Information about fines and fees can be found in your library account: <a href="https://khalifa.primo.exlibrisgroup.com/discovery/account?vid=971KUOSTAR_INST:KU&section=overview" target="_blank">My Library Account</a>. Contact the circulation desk for questions about specific charges.'},
-  {q:/open access|publish.*oa|apc|article processing/i, a:'Khalifa University supports open access publishing. Learn about APC funding and OA policies at: <a href="https://library.ku.ac.ae/oa/" target="_blank">library.ku.ac.ae/oa</a>'},
-  {q:/orcid|researcher.*id|author.*id/i, a:'Set up your ORCiD researcher profile with our guide: <a href="https://library.ku.ac.ae/orcid" target="_blank">library.ku.ac.ae/orcid</a>. ORCiD helps link your publications to your identity.'},
+  {q:/^(?:what is|explain|tell me about|how does)\s+(?:open access|oa|apc|article processing charge)(?:\s+publishing)?\??$|^(?:open access|oa|apc|article processing charge)\??$/i, a:'Khalifa University supports open access publishing. Learn about APC funding and OA policies at: <a href="https://library.ku.ac.ae/oa/" target="_blank">library.ku.ac.ae/oa</a>'},
+  {q:/^(?:how do i |how can i |help me )?(?:set up|register|create|use)?\s*(?:an )?(?:orcid|researcher.*id|author.*id)\??$|^(?:orcid|researcher.*id|author.*id)\??$/i, a:'Set up your ORCiD researcher profile with our guide: <a href="https://library.ku.ac.ae/orcid" target="_blank">library.ku.ac.ae/orcid</a>. ORCiD helps link your publications to your identity.'},
   {q:/khazna|institutional.*repository|thesis.*submit|deposit/i, a:'Khazna is Khalifa University\'s institutional repository for theses and research output: <a href="https://khazna.ku.ac.ae/" target="_blank">khazna.ku.ac.ae</a>'},
   {q:/google scholar|scholar.*ku/i, a:'Access Google Scholar with Khalifa University full-text links enabled: <a href="https://library.ku.ac.ae/google" target="_blank">library.ku.ac.ae/google</a>'},
   {q:/print|printing|photocopy|scan/i, a:'Printing, photocopying, and scanning facilities are available in both library branches. For details, visit the circulation desk or contact us at: <a href="https://library.ku.ac.ae/AskUs" target="_blank">Ask a Librarian</a>'},
@@ -513,14 +513,6 @@ async function callAgent(question) {
   if (!r || !r.ok) throw new Error('Agent service unavailable');
   const data = await r.json();
 
-  // Handle redirect-to-search signal from backend
-  if (data.intent === 'search_academic' || data.intent === 'search_medical') {
-    const redirectErr = new Error('REDIRECT_TO_SEARCH');
-    redirectErr.redirectToSearch = true;
-    redirectErr.correctedQuery = data.corrected_query || question;
-    throw redirectErr;
-  }
-
   // Defensive: if answer is missing entirely, throw so caller can fallback
   if (!data.answer && !data.error) throw new Error('Empty response from agent');
   if (!data.answer && data.error) throw new Error(data.error);
@@ -550,6 +542,7 @@ async function callAgent(question) {
     correctedQuery:  data.corrected_query || question,
     naturalQuery:    data.natural_query || question,
     databaseQuery:   data.database_query || question,
+    originalQuery:   data.original_question || question,
     redirectToSearch: false,
     // ask_librarian: null=auto-decide, true=always show, false=never show
     askLibrarian:    data.ask_librarian,
@@ -758,12 +751,12 @@ async function buildBoolean(query, history){
   // Pre-clean: strip chat prefixes, connectors, and follow-up fragments
   // so the backend receives a clean topic, not "and for physics" or "also about X"
   const cleanedQuery = query
-    // Strip common search prefixes
-    .replace(/^(find articles and books on|find articles on|find books on|search for|look for|i want|i need|give me|show me|get me|fetch|retrieve)\s+/i, '')
-    // Strip leading connectors/follow-up fragments that make queries meaningless
-    .replace(/^(and\s+(also\s+)?(for|about|on|in|related to|regarding)|also\s+(for|about|on|in)|what about|how about|or\s+about|tell me about|what is|what are|more\s+(about|on))\s+/i, '')
-    // Strip trailing noise
-    .replace(/\s+(please|thanks|thank you|asap|quickly|now)$/i, '')
+    // Light clean only: preserve the full request and all substantive constraints.
+    // Remove only leading conversational boilerplate.
+    .replace(/^\s*(please\s+)?(?:can you|could you|would you)\s+/i, '')
+    .replace(/^\s*(please\s+)?help me\s+/i, '')
+    .replace(/^\s*please\s+/i, '')
+    .replace(/\s+(please|thanks|thank you|asap)$/i, '')
     .trim();
 
   // === PROGRAMMATIC BOOLEAN BUILDER — always available, no LLM needed ===
@@ -828,19 +821,24 @@ async function buildBoolean(query, history){
 The user typed a query (possibly messy, fragmented, or with chat phrasing).
 
 Do THREE things:
-1. corrected: fix spelling, keep the core topic
-2. natural: write a MEANINGFUL research phrase for AI tools (Consensus, Perplexity, Semantic Scholar).
-   Must be a proper research phrase — NOT raw keywords, NOT Boolean operators.
-   If input is fragmented ("and for physics", "also about AI") extract the core topic and expand it.
-   Examples: "physics" → "recent advances in physics research"
-             "and for chemistry" → "chemistry research and applications"
-             "AI" → "artificial intelligence in research and technology"
-3. boolean: PRIMO/PubMed Boolean query with AND/OR/parentheses
+1. corrected: lightly edit the FULL request for spelling, grammar, and clarity.
+   Preserve every substantive concept and constraint from the user.
+2. natural: write a natural-language research query for AI tools (Consensus, Perplexity, Semantic Scholar, Scopus AI, PRIMO AI).
+   Keep the full context and all real constraints, but you may remove only retrieval boilerplate such as
+   "find an article", "show me", "get me", or "can you find".
+   Do NOT collapse the request into a short topic.
+3. boolean: PRIMO/PubMed Boolean query with AND/OR/parentheses that preserves the main concepts and constraints.
 
 Input examples:
-"and for physics" → corrected:"physics", natural:"recent advances in physics research", boolean:("physics" OR "physical sciences")
-"impuct glubal waming" → corrected:"impact global warming", natural:"impact of global warming on climate", boolean:("global warming" OR "climate change") AND (impact OR effect)
-"machne lerning helthcare" → corrected:"machine learning healthcare", natural:"machine learning applications in healthcare", boolean:("machine learning" OR AI) AND (healthcare OR clinical)
+"Find one peer-reviewed article from the last five years on climate change and biodiversity. Summarize the methodology and findings."
+→ corrected:"Find one peer-reviewed article from the last five years on climate change and biodiversity. Summarize the methodology and findings."
+→ natural:"Peer-reviewed article from the last five years on climate change and biodiversity. Summarize the methodology and findings."
+→ boolean:("climate change" OR "global warming") AND (biodiversity OR ecosystems)
+
+"impuct glubal waming on biodiversty"
+→ corrected:"impact of global warming on biodiversity"
+→ natural:"impact of global warming on biodiversity"
+→ boolean:("global warming" OR "climate change") AND biodiversity
 
 Query: "${cleanedQuery}"
 Context: ${ctx}
@@ -929,7 +927,7 @@ async function fullSearch(msg, chatHist, cm) {
     history: chatHist,
     onProgress: (d) => {
       progressData = d;
-      const label = wantBooksEarly ? `📗 Book Search: ${d.natural||d.explanation}` : `🔍 ${d.natural||d.explanation}`;
+      const label = wantBooksEarly ? `📗 Book Search: ${d.corrected||d.natural||d.explanation}` : `🔍 ${d.corrected||d.natural||d.explanation}`;
       // Build AI tools immediately — don't wait for PRIMO
       const pk = d.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
       const aq = d.natural || d.corrected || msg;
@@ -950,7 +948,7 @@ async function fullSearch(msg, chatHist, cm) {
     }
   });
 
-  const label = res.wantBooks ? `📗 Book Search: ${res.natural||res.explanation}` : `🔍 ${res.natural||res.explanation}`;
+  const label = res.wantBooks ? `📗 Book Search: ${res.corrected||res.natural||res.explanation}` : `🔍 ${res.corrected||res.natural||res.explanation}`;
   const primoKeyword = res.bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
   const aiQuery = res.natural || res.corrected || msg;
   const pubmedBtn = res.isMedical ? `<div style="margin-top:8px"><button class="fq" onclick="doSearchNew('${res.sid}','pubmed')" style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;font-size:.8rem;border:1px solid #6ee7b7;cursor:pointer;width:100%">🏥 Also search PubMed (medical literature)</button></div>` : '';
@@ -1082,9 +1080,12 @@ const TOPIC_SEARCH_RE=/\b(find|search|look for|show me|get me|give me|locate|i n
 const CONTENT_FIRST_RE=/^(articles?|papers?|books?|journals?|studies|publications?|research)\s+(on|about|regarding|related to|concerning)\s+\S/i;
 const SOME_ON_RE=/\b(some\s+)?(articles?|papers?|books?|research|studies)\s+(on|about|regarding|concerning)\s+\w/i;
 
-// Combined check: is this a topic search (not a library service question)?
+const STRUCTURED_ARTICLE_TASK_RE=/\b(one|single)\s+(peer.?reviewed\s+)?(article|paper|study)\b|\b(summariz(?:e|ing)|summaris(?:e|ing)|main research question|methodology|methods?|key findings|strengths?|limitations?|critical(?:ly)? evaluate|critique|contribution)\b/i;
+
+// Combined check: is this a simple topic search (not a structured article-analysis task)?
 function isTopicSearch(msg) {
   if (LIBRARY_SERVICE_RE.test(msg)) return false;
+  if (STRUCTURED_ARTICLE_TASK_RE.test(msg)) return false;
   return TOPIC_SEARCH_RE.test(msg) || CONTENT_FIRST_RE.test(msg) || SOME_ON_RE.test(msg);
 }
 
@@ -1143,7 +1144,7 @@ function logToAdmin(msg, intent, results) {
   try {
     // Field names must match worker.js D1 INSERT: question, tool, result_count, model
     fetch(W+'/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      question: (msg||'').substring(0,200),
+      question: (msg||''),
       tool: intent||'unknown',
       result_count: results||0,
       model: activeModel,
@@ -1496,6 +1497,14 @@ async function sendChat(){
         html += addFindResourcesBtn(agentResult.correctedQuery || msg);
       }
 
+      // For search answers returned directly in chat, keep the answer first
+      // and show AI research-tool links underneath.
+      if (['search_academic','search_medical'].includes(agentResult.intent)) {
+        const aiNatural = agentResult.naturalQuery || agentResult.correctedQuery || msg;
+        const aiPrimo = agentResult.databaseQuery || agentResult.correctedQuery || msg;
+        html += buildAIToolsPanel(aiNatural, aiPrimo);
+      }
+
       chatHist.push({role:'assistant', content: agentResult.html || html});
       addBotStreamed(html);
       window.lastIntent = agentResult.intent || 'agent';
@@ -1797,7 +1806,7 @@ function showFollowUps(intent, originalMsg){
 function showSearchRecovery(originalMsg, cm) {
   // originalMsg here is already the corrected query (from agent corrected_query)
   // for fallback paths it may still be raw — either way directSearch → buildBoolean will correct it
-  const displayMsg = originalMsg.length > 60 ? originalMsg.substring(0, 57) + '…' : originalMsg;
+  const displayMsg = originalMsg;
   const escapedMsg = originalMsg.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const recovery = document.createElement('div');
