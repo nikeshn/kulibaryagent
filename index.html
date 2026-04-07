@@ -60,7 +60,7 @@ header{background:var(--ku-blue);color:#fff;padding:10px 16px;display:flex;align
 .scard{background:#fff;border-radius:12px;padding:14px;border:1px solid var(--br);box-shadow:0 2px 8px rgba(0,51,102,.08);width:100%}
 .scard-title{font-weight:700;font-size:.86rem;color:var(--ku-blue);margin-bottom:4px}
 .bool-str{font-family:monospace;background:var(--ku-dark);color:var(--ku-gold);padding:6px 10px;border-radius:8px;font-size:.76rem;margin:6px 0;word-break:break-all}
-.slinks{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.slinks{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;margin-top:8px}
 .slink{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;text-decoration:none;font-size:.82rem;font-weight:600;transition:all .2s}
 .slink:hover{opacity:.85;transform:translateX(2px)}
 .slink.all{background:var(--ku-blue);color:#fff}
@@ -684,19 +684,16 @@ function buildSearchCard(bool,explanation,corrected,raw,yf,yt,pr,oa,ol){
   const urlArt=mkURL(bool,'CentralIndex','CentralIndex',artF);
   const urlBk=mkURL(bool,'Everything','MyInst_and_CI',bkF);
   const simpleQ=bool.replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
-  // EBSCO EZProxy deep link — IP auth via KU EZProxy
-  const ebscoUrl=`https://khalifa.idm.oclc.org/login?url=http://search.ebscohost.com/login.aspx?authtype=ip,uid&profile=eds&direct=true&bquery=${encodeURIComponent(simpleQ)}`;
   const q = (raw||'').toLowerCase();
   const wantBooks = /\b(books?|ebooks?|textbooks?)\b/i.test(q);
   const wantArticles = /\b(articles?|papers?|journals?|peer.?review)\b/i.test(q);
   const linkAll = `<a class="slink all" href="${urlAll}" target="_blank">📚 All Resources in PRIMO</a>`;
   const linkArt = `<a class="slink art" href="${urlArt}" target="_blank">📄 Articles in PRIMO</a>`;
   const linkBk  = `<a class="slink bk"  href="${urlBk}"  target="_blank">📗 Books in PRIMO</a>`;
-  const linkEBS = `<a class="slink" href="${ebscoUrl}" target="_blank" style="background:#fce7f3;color:#9d174d;border-color:#f9a8d4">📰 Search in EBSCO</a>`;
   let links;
-  if (wantBooks)    links = linkBk  + linkAll + linkArt + linkEBS;
-  else if (wantArticles) links = linkArt + linkAll + linkBk  + linkEBS;
-  else              links = linkAll + linkArt + linkBk  + linkEBS;
+  if (wantBooks)         links = linkBk  + linkAll + linkArt;
+  else if (wantArticles) links = linkArt + linkAll + linkBk;
+  else                   links = linkAll + linkArt + linkBk;
   return `<div class="scard"><div class="scard-title">🔍 Search in PRIMO</div><div class="bool-str">${bool}</div><div class="slinks">${links}</div></div>`;
 }
 
