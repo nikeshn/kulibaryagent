@@ -272,37 +272,27 @@ const RAG_URL = 'https://nikeshn-kulibrary.hf.space';
 // FAQ KNOWLEDGE BASE — instant answers, zero API cost
 // =================================================================
 const FAQ_KB = [
-  {q:/^\s*(?:dr\.?\s*)?abdulla(?:\s+al\s+hefeiti)?\s*$|^\s*hefeiti\s*$/i, a:'<strong>Dr. Abdulla Al Hefeiti</strong> is the <strong>Library Director / Assistant Provost, Libraries</strong>. He can help with strategic and institutional matters, library leadership, and partnerships. Email: abdulla.alhefeiti@ku.ac.ae | Phone: +971 2 312 3331'},
-  {q:/^\s*nikesh(?:\s+narayanan)?\s*$|^\s*narayanan\s*$/i, a:'<strong>Nikesh Narayanan</strong> is the <strong>Research &amp; Access Services Librarian</strong>. He can help with research support, Open Access, Khazna, ORCID, SciVal, Scopus, research impact, AI tools for research, and bibliometrics. Email: nikesh.narayanan@ku.ac.ae | Phone: +971 2 312 3980'},
-  {q:/^\s*rani(?:\s+anand)?\s*$|^\s*anand\s*$/i, a:'<strong>Rani Anand</strong> is the <strong>E-Resources Librarian</strong>. She can help with database access problems, e-resources troubleshooting, remote access, and vendor issues. Email: rani.anand@ku.ac.ae | Phone: +971 2 312 3935'},
-  {q:/^\s*jason(?:\s+fetty)?\s*$|^\s*fetty\s*$/i, a:'<strong>Jason Fetty</strong> is the <strong>Medical Librarian</strong>. He can help with medical and health sciences research, systematic reviews, PubMed, Embase, CINAHL, UpToDate, and clinical databases. Email: jason.fetty@ku.ac.ae | Phone: +971 2 312 4722'},
-  {q:/^\s*walter(?:\s+brian\s+hall|\s+hall)?\s*$|^\s*hall\s*$/i, a:'<strong>Walter Brian Hall</strong> is the <strong>Digital &amp; Technology Services Librarian / Systems Librarian</strong>. He can help with library website, systems, technology, digital infrastructure, and ORCID. Email: walter.hall@ku.ac.ae | Phone: +971 2 312 3163 | Mobile: 052-905-1491'},
-  {q:/^\s*alia(?:\s+al[-\s]?harrasi)?\s*$|^\s*harrasi\s*$/i, a:'<strong>Alia Al-Harrasi</strong> is the <strong>Manager, Technical Services</strong>. She can help with cataloguing, metadata, acquisitions processing, and technical services. Email: alia.alharrasi@ku.ac.ae | Phone: +971 2 312 3180'},
-  {q:/^\s*muna(?:\s+ahmad\s+mohammad\s+al\s+blooshi|\s+al\s+blooshi|\s+alblooshi)?\s*$|^\s*blooshi\s*$|^\s*alblooshi\s*$/i, a:'<strong>Muna Ahmad Mohammad Al Blooshi</strong> is the <strong>Manager, Public Services</strong>. She can help with circulation, general library services on Main Campus, and public services. Email: muna.alblooshi@ku.ac.ae | Phone: +971 2 312 4212'},
-  {q:/^\s*suaad(?:\s+al\s+jneibi|\s+aljneibi)?\s*$|^\s*jneibi\s*$|^\s*aljneibi\s*$/i, a:'<strong>Suaad Al Jneibi</strong> is a <strong>Library Information Senior Specialist</strong>. She can help with Interlibrary Loan (ILL) requests, document delivery, and general library questions. Email: suaad.aljneibi@ku.ac.ae | Phone: +971 2 312 4278'},
-  {q:/^\s*shamsa(?:\s+saeed\s+salem\s+alhosani|\s+alhosani)?\s*$|^\s*alhosani\s*$/i, a:'<strong>Shamsa Saeed Salem Alhosani</strong> is a <strong>Library Information Senior Specialist</strong>. She can help with library cataloguing and general library assistance. Email: shamsa.alhosani@ku.ac.ae | Phone: +971 2 312 3156'},
-  {q:/^\s*william(?:\s+nathaniel\s+hutchinson\s+iii|\s+hutchinson(?:\s+iii)?)?\s*$|^\s*hutchinson(?:\s+iii)?\s*$/i, a:'<strong>William Nathaniel Hutchinson III</strong> is a <strong>Library Information Senior Specialist</strong>. He can help with library cataloguing and general library assistance. Email: william.hutchinsoniii@ku.ac.ae | Phone: +971 2 312 3966'},
-  {q:/^\s*shaikha(?:\s+mohamed\s+saleem\s+almenhali|\s+almenhali)?\s*$|^\s*almenhali\s*$/i, a:'<strong>Shaikha Mohamed Saleem Almenhali</strong> is a <strong>Library Information Specialist</strong>. She can help with general library assistance. Email: shaikha.almenhali@ku.ac.ae | Phone: +971 2 312 5874'},
-  {q:/^\s*wilfredo(?:\s+arcilla)?\s*$|^\s*arcilla\s*$/i, a:'<strong>Wilfredo Arcilla</strong> is a <strong>Library Information Specialist</strong>. He can help with general library assistance. Email: wilfredo.arcilla@ku.ac.ae | Phone: +971 2 312 3323'},
-  {q:/^\s*zainab(?:\s+al\s+ali|\s+alali)?\s*$|^\s*al\s+ali\s*$|^\s*alali\s*$/i, a:'<strong>Zainab Al Ali</strong> is a <strong>Library Information Senior Specialist</strong>. She can help with general library assistance. Email: zainab.alali@ku.ac.ae | Phone: +971 2 312 4321'},
-  {q:/^\s*khawla(?:\s+alhemeiri)?\s*$|^\s*alhemeiri\s*$/i, a:'<strong>Khawla Alhemeiri</strong> is a <strong>Library Information Senior Specialist</strong>. She can help with general library assistance. Email: khawla.alhemeiri@ku.ac.ae | Phone: +971 2 312 3959'},
-  {q:/^\s*meera(?:\s+k\.?\s+alnaqbi|\s+alnaqbi)?\s*$|^\s*alnaqbi\s*$/i, a:'<strong>Meera K. Alnaqbi</strong> is a <strong>Library Information Specialist</strong>. She can help with acquisitions, new title requests, collection development, and general library assistance. Email: meera.alnaqbi@ku.ac.ae | Phone: +971 2 312 3375'},
-  {q:/^\s*(?:what are )?(?:the )?(?:library )?(?:hours|opening hours|closing hours)\s*$|^\s*is the library open(?: today| now)?\s*$|^\s*when does the library open\s*$|^\s*when does the library close\s*$/i, a:'For the most accurate opening and closing times, please check the official Library Hours page: <a href="https://library.ku.ac.ae/hours" target="_blank">library.ku.ac.ae/hours</a>. Hours may vary by campus and during exams, holidays, and Ramadan.'},
+  {q:/^\s*abdulla\s*$/i, a:'Did you mean <strong>Dr. Abdulla Al Hefeiti</strong>?<br><br><strong>Dr. Abdulla Al Hefeiti</strong> is the <strong>Library Director / Assistant Provost, Libraries</strong>. He can help with strategic and institutional matters, library leadership, and partnerships. Email: abdulla.alhefeiti@ku.ac.ae | Phone: +971 2 312 3331'},
+  {q:/^\s*hefeiti\s*$/i, a:'Did you mean <strong>Dr. Abdulla Al Hefeiti</strong>?<br><br><strong>Dr. Abdulla Al Hefeiti</strong> is the <strong>Library Director / Assistant Provost, Libraries</strong>. He can help with strategic and institutional matters, library leadership, and partnerships. Email: abdulla.alhefeiti@ku.ac.ae | Phone: +971 2 312 3331'},
+  {q:/^\s*nikesh(?:\s+narayanan)?\s*$/i, a:'<strong>Nikesh Narayanan</strong> is the <strong>Research &amp; Access Services Librarian</strong>. He can help with research support, Open Access publishing, Khazna repository, ORCID, SciVal, Scopus, research impact, AI tools for research, bibliometrics, scholarly communication, and LibGuides. Email: nikesh.narayanan@ku.ac.ae | Phone: +971 2 312 3980'},
+  {q:/^\s*rani(?:\s+anand)?\s*$/i, a:'<strong>Rani Anand</strong> is the <strong>E-Resources Librarian</strong>. She can help with database access problems, e-resources troubleshooting, remote access, and vendor issues. Email: rani.anand@ku.ac.ae | Phone: +971 2 312 3935'},
+  {q:/^\s*jason(?:\s+fetty)?\s*$/i, a:'<strong>Jason Fetty</strong> is the <strong>Medical Librarian</strong>. He can help with medical and health sciences research, systematic reviews, PubMed, Embase, CINAHL, UpToDate, and clinical databases. Email: jason.fetty@ku.ac.ae | Phone: +971 2 312 4722'},
+  {q:/^\s*walter(?:\s+brian\s+hall|\s+hall)?\s*$/i, a:'<strong>Walter Brian Hall</strong> is the <strong>Digital &amp; Technology Services Librarian / Systems Librarian</strong>. He can help with library website, systems, technology, digital infrastructure, ORCID, STEAM, coding, and Open Access publishing. Email: walter.hall@ku.ac.ae | Phone: +971 2 312 3163'},
+  {q:/\b(library hours|opening hours|closing hours|open today|closed today|open now|when.*open|when.*close|what time.*open|what time.*close|habshan.*open|san.*open|main campus.*open|ramadan hours|friday hours|saturday hours)\b/i, a:'For the most accurate opening and closing times, please check the official Library Hours page: <a href="https://library.ku.ac.ae/hours" target="_blank">library.ku.ac.ae/hours</a>. Hours may vary by campus and during exams, holidays, and Ramadan.'},
 ];
 
-function canUseFrontendFAQ(msg){
-  const q = (msg || '').trim();
-  if (!q) return false;
-  const words = q.split(/\s+/).filter(Boolean);
+
+function isFrontendFaqEligible(msg) {
+  const text = (msg || '').trim();
+  if (!text) return false;
+  const words = text.split(/\s+/).filter(Boolean);
   if (words.length > 6) return false;
-  if (/[;:]/.test(q)) return false;
-  if (/\b(find|search|look for|show me|get me|give me|need|want|compare|summari[sz]e|synthesi[sz]e|evaluate|critique|article|paper|book|journal|database|peer.?reviewed|open access|recent|latest|last\s+\d+\s+years?|20\d{2})\b/i.test(q)) return false;
+  if (/\b(19\d{2}|20\d{2}|last\s+\d+\s+years?|from\s+\d{4}|between|compare|contrast|synthesi(?:s|ze|zing)|summary|summariz(?:e|ing)|summaris(?:e|ing)|debate|outcomes|article|paper|study|journal|database|peer.?reviewed|open access|find|search|look for|get me|show me|recommend|suggest)\b/i.test(text)) return false;
   return true;
 }
 
 // =================================================================
 // SUBJECT → DATABASE MAPPING
-
 // =================================================================
 const SUBJECT_MAP = {
   'mechanical engineering': ['ASME Digital Library','Knovel','ScienceDirect','Scopus','ASTM Compass'],
@@ -541,6 +531,8 @@ async function callAgent(question) {
     redirectToSearch: false,
     // ask_librarian: null=auto-decide, true=always show, false=never show
     askLibrarian:    data.ask_librarian,
+    renderResultsLimit: data.render_results_limit,
+    resultsHeading: data.results_heading,
   };
 }
 
@@ -1131,7 +1123,7 @@ async function loadConfig() {
 }
 
 let GEN_SYS = `You are the Khalifa University Library Assistant, Abu Dhabi, UAE. KU = Khalifa University. Answer factually in 3-5 sentences. Only if the topic is clearly academic, add ONE sentence offering to find library resources.`;
-let LIB_SYS = `You are the Khalifa University Library Assistant. Answer questions about KU Library services, databases, borrowing, hours, and resources concisely (2-4 sentences). Include relevant URLs when helpful.`;
+let LIB_SYS = `You are the Khalifa University Library Assistant. Answer questions about KU Library services, databases, borrowing, hours, and resources clearly and directly. Include relevant URLs when helpful.`;
 
 function trimChatHist() { if(chatHist.length>20) chatHist=chatHist.slice(-20); }
 
@@ -1356,7 +1348,7 @@ async function sendChat(){
   }
 
   // 1. FAQ match (instant, free)
-  const faq = canUseFrontendFAQ(msg) ? FAQ_KB.find(f => f.q.test(msg)) : null;
+  const faq = isFrontendFaqEligible(msg) ? FAQ_KB.find(f => f.q.test(msg)) : null;
   if (faq) { addBotStreamed(faq.a + ' ' + badge()); chatHist.push({role:'assistant',content:faq.a}); window.lastIntent='faq'; logToAdmin(msg,'faq',1); showFollowUps('library'); return; }
 
   // 2. Database mention
@@ -1489,8 +1481,10 @@ async function sendChat(){
       if (agentResult.searchResults && agentResult.searchResults.length > 0) {
         const agSid = 'AG' + Date.now();
         window._primoResults[agSid] = agentResult.searchResults;
-        html += '<div style="margin-top:10px;font-size:.82rem;font-weight:700;color:var(--ku-blue)">📄 Relevant results found:</div>';
-        html += agentResult.searchResults.slice(0, 3).map((r, i) => renderResultCard(r, i, agSid)).join('');
+        const resultHeading = agentResult.resultsHeading || 'Relevant results found';
+        const resultLimit = Number.isInteger(agentResult.renderResultsLimit) ? agentResult.renderResultsLimit : 3;
+        html += '<div style="margin-top:10px;font-size:.82rem;font-weight:700;color:var(--ku-blue)">📄 ' + resultHeading + ':</div>';
+        html += agentResult.searchResults.slice(0, Math.max(0, resultLimit)).map((r, i) => renderResultCard(r, i, agSid)).join('');
       }
 
       // Tool badges
