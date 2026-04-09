@@ -597,7 +597,7 @@ async function sendChat(text, meta = {}) {
 
     if (['search_academic', 'search_medical'].includes(data.intent)) {
       const aiQuery = data.ai_tool_query || data.natural_query || question;
-      html += buildAIToolsPanel(aiQuery);
+      html += buildAIToolsPanel(aiQuery, data.primo_search_url || '');
     }
 
     const msgEl = addMsg('bot', html);
@@ -825,13 +825,15 @@ async function doSearch() {
 // ═══════════════════════════════════════════════════════════════
 // AI TOOLS PANEL
 // ═══════════════════════════════════════════════════════════════
-function buildAIToolsPanel(naturalQuery) {
+function buildAIToolsPanel(naturalQuery, primoSearchUrl = '') {
   const cleanQuery = (naturalQuery || '').trim();
   const nq = encodeURIComponent(cleanQuery);
   const oaQ = cleanQuery.replace(/\s+/g, '+');
   const ebscoUrl = `https://khalifa.idm.oclc.org/login?url=http://search.ebscohost.com/login.aspx?authtype=ip,uid&profile=eds&direct=true&bquery=${nq}`;
+  const primoButton = primoSearchUrl ? `<div style="margin-bottom:8px"><a class="ai-tool-chip primoai" href="${primoSearchUrl}" target="_blank">📚 PRIMO Boolean Search</a></div>` : '';
   return `<div class="ai-panel">
     <div class="ai-panel-title">✨ Also Try These AI Research Tools</div>
+    ${primoButton}
     <div class="ai-row-label">🔐 KU Subscribed</div>
     <div class="ai-tools-strip">
       <a class="ai-tool-chip leapspace" href="https://www.sciencedirect.com/leapspace?query=${nq}" target="_blank">🔬 LeapSpace</a>
