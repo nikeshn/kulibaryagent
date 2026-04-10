@@ -693,7 +693,7 @@ async function executeSearch(query, opts = {}) {
       <a class="slink art" href="${urlArt}" target="_blank">📄 Articles</a>
       <a class="slink bk"  href="${urlBk}"  target="_blank">📗 Books</a>
     </div>
-    ${buildAIToolsPanel(query)}
+    ${buildAIToolsPanel(query, urlAll)}
     <div style="margin-top:10px;font-size:.8rem;color:var(--mu);display:flex;align-items:center;gap:6px">
       <div class="typing"><span></span><span></span><span></span></div>
       <span>Fetching PRIMO results…</span>
@@ -793,7 +793,7 @@ async function doSearch() {
     </div>`;
 
     // AI tools
-    html += buildAIToolsPanel(query);
+    html += buildAIToolsPanel(query, urlAll);
 
     // PubMed for medical topics
     if (isMedical) {
@@ -825,28 +825,21 @@ async function doSearch() {
 // ═══════════════════════════════════════════════════════════════
 // AI TOOLS PANEL
 // ═══════════════════════════════════════════════════════════════
-function buildAIToolsPanel(naturalQuery, primoSearchUrl = '') {
+function buildAIToolsPanel(naturalQuery, primoDiscoveryUrl = '') {
   const cleanQuery = (naturalQuery || '').trim();
   const nq = encodeURIComponent(cleanQuery);
-  const oaQ = cleanQuery.replace(/\s+/g, '+');
-  const ebscoUrl = `https://khalifa.idm.oclc.org/login?url=http://search.ebscohost.com/login.aspx?authtype=ip,uid&profile=eds&direct=true&bquery=${nq}`;
-  const primoButton = primoSearchUrl ? `<div style="margin-bottom:8px"><a class="ai-tool-chip primoai" href="${primoSearchUrl}" target="_blank">📚 PRIMO Boolean Search</a></div>` : '';
+  const fallbackDiscovery = primoDiscoveryUrl || `${PRIMO_BASE}?query=any,contains,${encodeURIComponent(cleanQuery)}&lang=en&mode=advanced&offset=0`;
   return `<div class="ai-panel">
-    <div class="ai-panel-title">✨ Also Try These AI Research Tools</div>
-    ${primoButton}
-    <div class="ai-row-label">🔐 KU Subscribed</div>
+    <div class="ai-panel-title">✨ Continue with AI Research Tools</div>
+    <div class="ai-row-label">AI Sources</div>
     <div class="ai-tools-strip">
       <a class="ai-tool-chip leapspace" href="https://www.sciencedirect.com/leapspace?query=${nq}" target="_blank">🔬 LeapSpace</a>
       <a class="ai-tool-chip scopus" href="https://www-scopus-com.khalifa.idm.oclc.org/pages/ai?query=${nq}" target="_blank">🔭 Scopus AI</a>
-      <a class="ai-tool-chip ebscoai" href="${ebscoUrl}" target="_blank">📰 EBSCO AI</a>
-      <a class="ai-tool-chip primoai" href="${PRIMO_AI_URL}${nq}" target="_blank">⭐ PRIMO AI</a>
-    </div>
-    <div class="ai-row-label">🆓 Freemium</div>
-    <div class="ai-tools-strip">
       <a class="ai-tool-chip consensus" href="https://consensus.app/results/?q=${nq}" target="_blank">🧬 Consensus</a>
-      <a class="ai-tool-chip scispace" href="https://scispace.com/search?q=${nq}" target="_blank">🧪 SciSpace</a>
-      <a class="ai-tool-chip perplexity" href="https://www.perplexity.ai/search?q=${nq}" target="_blank">🔎 Perplexity</a>
-      <a class="ai-tool-chip openalex" href="https://openalex.org/works?page=1&sort=relevance_score:desc&search.semantic=${oaQ}" target="_blank">🌐 OpenAlex</a>
+    </div>
+    <div class="ai-row-label">KU Access</div>
+    <div class="ai-tools-strip">
+      <a class="ai-tool-chip primoai" href="${fallbackDiscovery}" target="_blank">📚 PRIMO Library Discovery</a>
     </div>
   </div>`;
 }
