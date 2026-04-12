@@ -275,9 +275,20 @@ const PRIMO_AI_URL = 'https://khalifa.primo.exlibrisgroup.com/discovery/research
 const VID = '971KUOSTAR_INST:KU';
 const FETCH_TIMEOUT = 35000;
 
-let currentModel = 'gpt';
-let chatHistory = [];
-let isSending = false;
+var currentModel = 'gpt';
+var chatHistory = [];
+var isSending = false;
+
+function promptFindArticles() {
+  var input = document.getElementById('chatIn');
+  if (!input) return;
+  input.value = 'Find articles on ';
+  input.focus();
+  var len = input.value.length;
+  input.setSelectionRange(len, len);
+  var chips = document.getElementById('chips');
+  if (chips) chips.style.display = 'none';
+}
 window._primoResults = {};
 
 const STORAGE_KEYS = {
@@ -1041,19 +1052,7 @@ document.addEventListener('toggle', e => {
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
-function promptFindArticles() {
-  // Pre-fill the input so the user types their subject rather than sending a generic query
-  const input = document.getElementById('chatIn');
-  if (!input) return;
-  input.value = 'Find articles on ';
-  input.focus();
-  // Place cursor at end
-  const len = input.value.length;
-  input.setSelectionRange(len, len);
-  document.getElementById('chips').style.display = 'none';
-}
-
-
+document.addEventListener('DOMContentLoaded', () => {
   setModel('gpt');
   // Initialize all panels hidden except chat
   document.querySelectorAll('.panel').forEach(p => {
