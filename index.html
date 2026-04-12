@@ -194,7 +194,7 @@ header{background:var(--ku-blue);color:#fff;padding:10px 16px;display:flex;align
   </div>
   <div class="chat-bottom">
     <div class="chips" id="chips">
-      <div class="chip" onclick="sendChat('Find articles on AI')">📚 Find Articles</div>
+      <div class="chip" onclick="promptFindArticles()">📚 Find Articles</div>
       <div class="chip" onclick="sendChat('What are the library hours?')">⏰ Hours</div>
       <div class="chip" onclick="sendChat('How do I get full text for an article?')">📄 Full Text</div>
       <div class="chip" onclick="sendChat('How do I reserve a study room?')">🚪 Study Rooms</div>
@@ -637,23 +637,41 @@ function buildPrimoURL(bool, tab, scope, facets) {
 }
 
 async function buildSearchPlan(query, opts = {}) {
-  const payload = {
-    question: query,
-    peer_reviewed: !!opts.pr,
-    open_access: !!opts.oa,
-    year_from: opts.yf || null,
-    year_to: opts.yt || null,
-    resource_type: opts.resourceType || null
-  };
+  // Route through /agent so topic extraction, boolean building, and facets
+  // all use the same LLM pipeline as the chat tab — no separate /search/plan needed.
   try {
-    const res = await fetchWithTimeout(API_URL + '/search/plan', {
+    const res = await fetchWithTimeout(API_URL + '/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }, 20000);
-    if (!res.ok) throw new Error('Plan error: ' + res.status);
-    return await res.json();
+      body: JSON.stringify({
+        question: query,
+        model: currentModel,
+        history: [],
+        client_state: null
+      })
+    }, 25000);
+    if (!res.ok) throw new Error('Agent error: ' + res.status);
+    const data = await res.json();
+    // Extract search plan fields from the agent response
+    const bool = data.primo_boolean_query || makeBoolean(query);
+    const topic = data.corrected_query || data.natural_query || query;
+    const isMedical = data.intent === 'search_medical';
+    const cleanBool = sanitizeBoolean(bool);
+    return {
+      topic,
+      display_topic: topic,
+      resource_type: opts.resourceType || (/\bbooks?\b/i.test(query) ? 'books' : 'articles'),
+      is_medical: isMedical,
+      ai_tool_query: data.ai_tool_query || data.natural_query || query,
+      primo_boolean_query: cleanBool,
+      primo_all_url: data.primo_search_url || buildPrimoURL(cleanBool, 'Everything', 'MyInst_and_CI', []),
+      primo_articles_url: buildPrimoURL(cleanBool, 'CentralIndex', 'CentralIndex', ['rtype,include,articles']),
+      primo_books_url: buildPrimoURL(cleanBool, 'Everything', 'MyInst_and_CI', ['rtype,include,books']),
+      primo_ai_url: data.primo_ai_url || `${PRIMO_AI_URL}${encodeURIComponent(data.ai_tool_query || query)}`,
+      pubmed_url: data.pubmed_search_url || (isMedical ? `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(topic)}` : ''),
+    };
   } catch (_) {
+    // Local fallback — no API cost
     const bool = makeBoolean(query);
     const cleanQuery = sanitizeBoolean(bool).replace(/[()"]/g,'').replace(/\b(AND|OR)\b/g,' ').replace(/\s+/g,' ').trim();
     const isMedical = /\b(medicine|medical|health|clinical|nursing|pharmacy|pubmed|embase|cinahl|cochrane|uptodate|systematic review|cancer|diabetes|treatment|diagnosis|surgery|biomedical)\b/i.test(query);
@@ -1023,7 +1041,19 @@ document.addEventListener('toggle', e => {
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+function promptFindArticles() {
+  // Pre-fill the input so the user types their subject rather than sending a generic query
+  const input = document.getElementById('chatIn');
+  if (!input) return;
+  input.value = 'Find articles on ';
+  input.focus();
+  // Place cursor at end
+  const len = input.value.length;
+  input.setSelectionRange(len, len);
+  document.getElementById('chips').style.display = 'none';
+}
+
+
   setModel('gpt');
   // Initialize all panels hidden except chat
   document.querySelectorAll('.panel').forEach(p => {
