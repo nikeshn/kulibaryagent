@@ -470,10 +470,12 @@ function showFollowUps(promptText, suggestions = []) {
       const btn = document.createElement('button');
       btn.className = 'fq';
       btn.textContent = s.label || s.question || 'Follow up';
-      btn.addEventListener('click', () => sendChat(s.question || s.label || '', {
-        followUpAction: s.action || null,
-        contextId: s.context_id || null
-      }));
+      btn.addEventListener('click', () => {
+        const meta = {};
+        if (s.action) meta.followUpAction = s.action;
+        if (s.context_id) meta.contextId = s.context_id;
+        sendChat(s.question || s.label || '', meta);
+      });
       d.appendChild(btn);
     });
     cm.appendChild(d);
