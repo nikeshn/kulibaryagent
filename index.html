@@ -571,14 +571,9 @@ async function sendChat(text, meta = {}) {
     chatHistory.push({ role: 'assistant', content: stripHtml(data.answer) });
     trimHistory();
 
-    let html = fmt(data.answer);
+    let html = (data.answer||"").replace(/\n/g,"<br>");
 
-    if (data.search_results && data.search_results.length > 0) {
-      const sid = 'AG' + Date.now();
-      window._primoResults[sid] = data.search_results;
-      html += '<div style="margin-top:10px;font-size:.82rem;font-weight:700;color:var(--ku-blue)">📄 Results found:</div>';
-      html += renderResultsWithSections(data.search_results.slice(0, 12), sid);
-    }
+    // OpenAlex/PRIMO results removed — users click platform links in footer
 
     if (data.sources && data.sources.length > 0) {
       html += '<div style="margin-top:8px;font-size:.75rem;color:var(--mu)"><strong>Sources:</strong> ';
@@ -978,20 +973,28 @@ function renderResultCard(r, idx, sid, num) {
   const dateLine = r.date || r.year || '';
   const metaLine = [authorsLine, dateLine, r.type || (isOA ? 'Article' : '')].filter(Boolean).join(' · ');
 
-  // "Read more" goes to PRIMO title search for OpenAlex, direct link for PRIMO
-  const readMoreLabel = isOA ? 'Find in PRIMO →' : 'View →';
+  // For OpenAlex: primary link = DOI or direct URL; secondary = PRIMO title search
+  // For PRIMO/PubMed: primary link = primo_url or link
+  const directLink = isOA
+    ? (r.doi ? 'https://doi.org/' + r.doi : r.link || '#')
+    : (r.primo_url || r.link || (r.doi ? 'https://doi.org/' + r.doi : '') || (r.pmid ? 'https://pubmed.ncbi.nlm.nih.gov/' + r.pmid + '/' : '#'));
+  const primoSearchLink = isOA ? (r.primo_url || '') : '';
 
   return `<div class="rcard">
-    <div class="rcard-title">${numLabel}<a href="${link}" target="_blank">${safeTitle}</a></div>
+    <div class="rcard-title">${numLabel}<a href="${directLink}" target="_blank">${safeTitle}</a></div>
     ${metaLine ? `<div class="rcard-meta">${metaLine.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
     ${r.source && !isOA ? `<div class="rcard-meta">${r.source}</div>` : ''}
     ${descHtml}
     <div class="rcard-tags">${srcTag}${oaTag}</div>
     <div class="rcard-actions">
-      <button class="rcard-btn primary" onclick="window.open('${link}','_blank')">${readMoreLabel}</button>
-      ${!isOA ? `<button class="rcard-btn" onclick="showCite('${sid}',${idx},'apa')">APA</button>
-      <button class="rcard-btn" onclick="showCite('${sid}',${idx},'ieee')">IEEE</button>
-      <button class="rcard-btn" onclick="showCite('${sid}',${idx},'harvard')">Harvard</button>` : ''}
+      ${isOA
+        ? `<button class="rcard-btn primary" onclick="window.open('${directLink}','_blank')">Read Article →</button>
+           ${primoSearchLink ? `<button class="rcard-btn" onclick="window.open('${primoSearchLink}','_blank')">Find in PRIMO →</button>` : ''}`
+        : `<button class="rcard-btn primary" onclick="window.open('${directLink}','_blank')">View →</button>
+           <button class="rcard-btn" onclick="showCite('${sid}',${idx},'apa')">APA</button>
+           <button class="rcard-btn" onclick="showCite('${sid}',${idx},'ieee')">IEEE</button>
+           <button class="rcard-btn" onclick="showCite('${sid}',${idx},'harvard')">Harvard</button>`
+      }
     </div>
     <div id="${citeId}"></div>
   </div>`;
