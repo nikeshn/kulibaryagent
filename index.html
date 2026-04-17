@@ -440,6 +440,16 @@ function showWelcomeScreen() {
   document.getElementById('sendBtn').disabled = false;
   document.getElementById('chatIn').disabled = false;
   document.getElementById('chatIn').value = '';
+  // Reset subject box
+  var sw = document.getElementById('wlc-subject-wrap');
+  var mainSearch = document.querySelector('.wlc-search-wrap');
+  if (sw) sw.style.display = 'none';
+  if (mainSearch) mainSearch.style.display = 'block';
+  var si = document.getElementById('wlcSubjectIn');
+  if (si) si.value = '';
+  // Reset Find Articles button highlight
+  var btns = document.querySelectorAll('.wlc-btn');
+  btns.forEach(function(b) { b.style.background = ''; b.style.borderColor = ''; });
 }
 window._primoResults = {};
 
