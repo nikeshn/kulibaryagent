@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>LibBee — KU Library AI Assistant</title>
+<meta name="description" content="AI-powered library assistant for Khalifa University. Find research, check hours, discover events and connect with the right librarian.">
+<meta property="og:title" content="LibBee — KU Library AI Assistant">
+<meta property="og:description" content="AI-powered library assistant for Khalifa University. Find research, check hours, discover events and connect with the right librarian.">
+<meta property="og:image" content="https://ku-library.github.io/LibBee/assets/libbee-mascot.png">
+<meta property="og:url" content="https://ku-library.github.io/LibBee/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LibBee — KU Library AI Assistant">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="LibBee — KU Library AI Assistant">
+<meta name="twitter:description" content="AI-powered library assistant for Khalifa University. Find research, check hours, discover events and connect with the right librarian.">
+<meta name="twitter:image" content="https://ku-library.github.io/LibBee/assets/libbee-mascot.png">
 <link rel="icon" href="assets/libbee-mascot.png" type="image/png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -684,6 +695,7 @@ async function sendChat(text, meta = {}) {
   trimHistory();
 
   try {
+    // Summary/snapshot requests chain two LLM calls — give them more time
     const agentTimeout = FETCH_TIMEOUT;
     const res = await fetchWithTimeout(API_URL + '/agent', {
       method: 'POST',
